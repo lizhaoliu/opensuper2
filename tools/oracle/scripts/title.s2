@@ -1,0 +1,45 @@
+#! saves town
+# Title-screen menus (items: 0 new game, 1 load, 2 VS, 3 settings, 4 quit, the
+# selection stays where it was): settings, load menu with the "town" fixture's
+# save in slot 1, and the quit prompt (cancelled). VS setup: versus.s2.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+key DOWN
+key DOWN
+frames 30
+shot title_sel
+key RETURN
+frames 200
+shot settings
+move 300 200
+frames 60
+shot settings_hover
+rclick 320 240
+frames 200
+shot title_back
+key UP
+key UP
+frames 30
+key RETURN
+frames 200
+shot load
+move 320 120
+frames 60
+shot load_hover
+rclick 320 240
+frames 200
+shot title_back2
+key DOWN
+key DOWN
+key DOWN
+frames 30
+key RETURN
+frames 200
+shot quit_prompt
+rclick 320 240
+frames 200
+shot title_back3

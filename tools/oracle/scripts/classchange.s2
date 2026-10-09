@@ -1,0 +1,63 @@
+#! saves classchange
+# Class change at the church (the "classchange" fixture: route 0's between-stages
+# save after stage 25, six members eligible): the list, 志超's two cards (劍客, and
+# 魔法劍士 shown unavailable), the change screen, confirming, then 艾文's
+# seven tier-4 cards, the second change, and saving to slot 2 (compared byte for byte).
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+shot town
+click 540 370
+frames 300
+shot church
+click 562 260
+frames 200
+shot classlist
+click 275 268
+frames 300
+shot cards
+move 245 150
+frames 60
+shot cards_hover
+click 100 150
+frames 200
+shot confirm
+click 110 428
+frames 400
+frames 400
+shot changed
+click 275 268
+frames 300
+shot cards2
+move 390 150
+frames 60
+click 390 150
+frames 200
+shot confirm2
+click 110 428
+frames 400
+shot changed2
+rclick 320 240
+frames 300
+shot church_back
+rclick 320 240
+frames 300
+shot town_back
+click 298 253
+click 298 253
+frames 400
+shot inn
+click 492 239
+frames 300
+shot save_menu
+click 320 95
+frames 300
+shot saved

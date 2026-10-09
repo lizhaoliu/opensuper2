@@ -1,0 +1,70 @@
+#! saves town
+# Town flow from the "town" fixture (a between-stages save after stage 2, see
+# docs/oracle.md): load menu, town square, inn and its screens.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+shot load_menu
+key RETURN
+frames 300
+shot town
+move 298 253
+frames 60
+shot town_inn_hover
+click 298 253
+frames 200
+shot inn
+move 322 223
+frames 60
+shot inn_status_hover
+click 322 223
+frames 200
+shot status_list
+rclick 320 240
+frames 200
+shot inn_back
+click 352 361
+frames 200
+shot equipment
+rclick 320 240
+frames 200
+click 409 230
+frames 200
+shot items
+rclick 320 240
+frames 200
+click 492 239
+frames 200
+shot save_menu
+rclick 320 240
+frames 200
+click 575 243
+frames 200
+shot load_menu2
+rclick 320 240
+frames 200
+click 272 180
+frames 200
+shot settings
+rclick 320 240
+frames 200
+click 517 118
+frames 300
+shot worldmap
+rclick 320 240
+frames 200
+click 345 161
+frames 200
+shot keeper
+click 320 240
+frames 200
+shot keeper2
+rclick 320 240
+frames 200
+shot inn_exit

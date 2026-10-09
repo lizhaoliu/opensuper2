@@ -1,0 +1,48 @@
+#! saves classchange_hidden
+# A hidden class: the "classchange_hidden" fixture is route 0's between-stages save after
+# stage 48 with 法科爾 (聖戰士 L31) holding 銀牙彎刀 (item 266, equip slot 5), which
+# 海盜 requires (FUN_00455c85). His cards then show 海盜 among his promotions, the change uses
+# the item up (FUN_00455d21), and the save to slot 2 is compared byte for byte.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+shot town
+click 540 370
+frames 300
+shot church
+click 562 260
+frames 200
+shot classlist
+click 275 387
+frames 300
+shot cards
+move 535 150
+frames 60
+shot cards_hover
+click 535 150
+frames 200
+shot confirm
+click 110 428
+frames 400
+shot changed
+rclick 320 240
+frames 300
+shot church_back
+rclick 320 240
+frames 300
+click 298 253
+frames 400
+click 492 239
+frames 300
+shot save_menu
+click 320 95
+frames 300
+shot saved

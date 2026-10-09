@@ -1,0 +1,10 @@
+[package]
+name = "s2data"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Readers for the original SuperSp (北方密使) data files"
+
+[dependencies]
+thiserror.workspace = true
+encoding_rs.workspace = true

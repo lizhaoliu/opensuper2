@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["crates/s2data", "crates/s2tool", "crates/s2engine", "crates/s2app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+license = "MIT"
+authors = ["lizhaoliu <lizhaoliu@gmail.com>"]
+description = "OpenSuper2: a clean-room engine for 超時空英雄傳說2 北方密使 that reads the original game data"
+
+[workspace.dependencies]
+s2data = { path = "crates/s2data" }
+s2engine = { path = "crates/s2engine" }
+anyhow = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive", "env"] }
+png = "0.17"
+encoding_rs = "0.8"
+winit = "0.30"
+softbuffer = "0.4"

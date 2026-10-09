@@ -1,0 +1,31 @@
+#! saves town
+# Save/load round trip from the "town" fixture: save to slot 2 at the inn,
+# see it listed, load it back. The written UJ02.SAV is compared byte for byte.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+click 298 253
+frames 200
+click 492 239
+frames 200
+shot save_menu
+click 320 95
+frames 200
+shot saved
+click 575 243
+frames 200
+shot load_menu
+click 320 95
+frames 100
+shot load_confirm
+key RETURN
+frames 400
+shot loaded

@@ -1,0 +1,45 @@
+#! saves town
+# Two-player (VS) setup from the title: stage list, both army save pickers
+# (the "town" fixture's save in slot 1), then the VS battle start.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+key DOWN
+frames 30
+key RETURN
+frames 300
+shot vs
+click 310 152
+frames 150
+shot stage_list
+move 455 178
+frames 30
+shot stage_hover
+click 455 178
+frames 150
+shot stage_picked
+click 310 222
+frames 150
+shot blue_list
+click 320 65
+frames 150
+shot blue_picked
+click 310 292
+frames 150
+click 320 65
+frames 150
+shot red_picked
+click 230 437
+frames 300
+shot start1
+frames 300
+shot start2
+key RETURN
+frames 300
+shot start3
+key RETURN
+frames 300
+shot start4

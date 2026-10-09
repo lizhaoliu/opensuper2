@@ -1,0 +1,6 @@
+/target
+/tools/.venv
+__pycache__/
+# Original game data and decompiler output never go in this repo.
+/gamedata
+*.sav

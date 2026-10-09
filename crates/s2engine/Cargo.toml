@@ -1,0 +1,11 @@
+[package]
+name = "s2engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Game logic of OpenSuper2, ported from the original control flow"
+
+[dependencies]
+s2data.workspace = true
+anyhow.workspace = true
+png.workspace = true

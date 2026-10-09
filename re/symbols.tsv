@@ -1,0 +1,637 @@
+addr	name	comment
+0046dedd	res_load	load whole archive entry (kind,id)
+0046e13b	res_open	open archive positioned at entry (kind,id,&span)
+004217b9	load_palette_and_index	reads SUPERSP.PAL palette + archive index
+00420e5c	rle_decode	RLE frame -> raw w*h+4
+0046af47	rle_blit	clipped RLE blit to 640x480 back buffer
+0045e9c1	fxset_load	load CEL1 frame set
+004247da	WinMain	
+0040d010	game_state_loop	top-level state dispatcher
+0040d108	stage_loop	one stage: script, player turn, enemy turn
+00419b1d	play_sound	play sfx id (1..245) on one of 16 voices; slot arg re-triggers; returns slot+1
+0041a01c	load_sound	read sfx id from BIN 17 (RIFF WAVE) into Miles memory
+0041a152	load_music	read music id from BIN 18 (XMIDI)
+0041999a	play_midi	start XMIDI song id (1..37); loop==-1 -> infinite
+004198d4	play_music	music id -> CD track via disc table or MIDI; mode 2 forces MIDI
+00419a7b	stop_music	stop MIDI and CD music
+00419b08	stop_sounds	stop all sample voices
+00419f99	stop_sounds_impl	end + free all sample voices
+00419d3a	audio_init	AIL startup, digital driver, 16 voices, MIDI out
+00419ee4	audio_shutdown	release handles, AIL shutdown
+0041a282	open_digital	AIL_waveOutOpen at rate/bits/channels
+00419ad1	set_midi_volume	0..100 -> 0..127
+0040756c	cd_open	open redbook drive, count tracks
+00407678	cd_play_track	play CD track (arg+1), loop flag
+00407816	cd_play_current	AIL_redbook_play of DAT_00492add
+00407782	cd_loop_poll	replay CD track when stopped and looping
+004076da	cd_stop	stop CD audio
+004077cb	cd_set_volume	0..100 -> 0..127
+004198a4	audio_poll	per-frame CD loop poll
+004593dd	movie_load_cues	read 21-byte movie record + 6-byte sound cues from BIN 7
+00459566	movie_play	play FLC movie (DAT 20+n) with sound cues
+0041a370	play_intro_movies	LOGO + SPMARK at startup if CDDA 2nd field ON
+0041a631	play_movie_resume_music	event: movie then resume current music
+0042422b	load_bin10_tables	BIN 10 arrays incl. effect->sound table (DAT_004a1f50)
+00423b00	config_read	parse SUPERSP.CFG
+00423eb9	config_write	write SUPERSP.CFG
+00407490	detect_disc	read DISK.ID -> DAT_00497b58 (0=disc1)
+0041d280	event_cmd_media	event script ops: 1 sound, 2 music, 3 CG+music, 4 set vars, 5 movie, 6 set var
+00422b8e	stage_load	load stage id from BIN1: header->DAT_00494688, block sections, script
+00422e26	stage_read_name	read stage name only
+00422f83	stage_read_header	read 30-byte stage header
+00423033	stage_begin	load stage + set next/branch globals + build armies
+00422a97	stage_copy_treasure	copy reward kind-5 treasure spots to DAT_00494598
+00417556	script_attach	script object (0x492bd0): set event table pointer
+0041734c	script_detach	
+00417369	script_load_state	restore consumed-event bytes from save
+0041745a	script_save_state	write event type bytes to save
+00417587	event_check	condition dispatch for event types 4..16
+004178fa	events_poll	poll types 4..16, fire matching events
+00417a1d	events_turn_start	type 1 events for turn DAT_00494674
+00417b74	events_victory	type 2 events for win set DAT_004952cc
+00417cbd	events_enemy_wiped	type 3/1 after enemy phase
+00417d8e	events_battle_talk	type 3/3 attacker vs defender dialogue
+00417f26	events_unit_down	type 3/2 last words on defeat
+00418203	events_flag_chain	type 9/0 events chained on flags
+00418408	event_prepare	set line table/text pool pointers, load portraits
+00418478	event_load_portraits	load CEL3 portraits for speakers
+004188ca	event_show_dialogue	draw box/portrait/name per line and type text
+00418e73	dialogue_typewriter	typewriter with @@W/D/RW/RD@@ markup
+0041929b	event_choice_menu	type 5/0 choice menu
+0041be4c	events_flag_chain_all	repeat events_flag_chain until nothing fires
+0041be7a	flag_side_effect	flags 1/3 reveal special tiles, 7 enemy op
+0041c025	event_deploy_units	type 6 deploy helper
+0041c18c	event_withdraw_units	type 6 withdraw helper
+0041c267	event_cond_adjacent	type 4
+0041c302	event_deploy	type 6
+0041c3ce	event_move	type 7
+0041c437	event_camera	type 8
+0041c81c	event_flags	type 9
+0041cb9a	event_items	type 10
+0041ce89	event_unit_state	type 11
+0041d217	event_unit_action	type 12 (-> FUN_0045bc6a)
+0041d280	event_system	type 13 difficulty/sound/music/picture/movie
+0041d484	event_stats	type 14
+0041d6b9	event_group_walk	type 15
+0041d9ec	event_group_move	type 16
+0045bc6a	army_unit_action	type 12 ops
+00458703	army_move_unit	type 7 ops
+00441326	units_adjacent	iso-diagonal adjacency, height diff < 4
+00433161	check_defeat	lose codes + flag 5 + turn 100
+00433257	check_victory	win sets + flag 4 -> DAT_004952cc
+0044e99d	army_all_down	k>0 char k dead; 0 all; -1 main party; -2 leaders; -3 non-leaders
+0045cbf8	army_on_exit_tile	win codes 0x1f/0x20
+00423aea	flags_clear_stage	clear flags 1..40
+00423ad4	flags_clear_all	clear flags 1..80
+00423b00	config_load	SUPERSP.CFG; forces DAT_004944f4=0
+0040d729	enemy_level_scaling	header +0x17/+0x18 scaling
+0041ecd6	big5_slot	Big5 code -> glyph index slot
+0041ec63	font_fetch16	copy 16x16 glyph bitmap
+0041ec91	font_fetch24	copy 24x24 (or alt 16x16) glyph bitmap
+0041e308	glyph16_draw	Big5 16x16 cell + style
+0041eeb6	glyph24_draw	Big5 24x24 cell + style
+0041e700	ascii8_draw	8x15 ASCII cell + style
+0041f2ab	ascii16_draw	16x24 ASCII cell + style
+0041e2e0	font_set_colors	color, second color, target
+0041df60	text_draw_small	compact line: ascii +8, big5 +16
+0041f748	text_draw	normal line: ascii(x+2) +16, big5 +24
+0041f6d3	text_draw_number	printf into text_draw
+0041f87c	text_draw_wrapped	boxed multi-line text, '*' break
+0041fa6c	text_type_char	typewriter: draw one char, advance pen
+0041eb94	font_load_big5	BIN 11..14
+0041de58	font_load_ascii	BIN 15/16
+00424122	ui_strings_load	BIN 5 (or 6)
+004242f2	item_help_load	ITEMHLSP.BIN or DAT 3
+0045f57c	spell_help_read	BIN 9 record
+0041b5dc	endings_load	BIN 3
+0040fd3c	worldmap_init	BIN 4 locations
+0046cf8f	fatal_error	error box; #Fxxx tags name the call site
+004741c0	sys_init_window	create window + DirectDraw (FUN_00474335, FUN_00474257)
+00424450	game_init	startup: cfg, palette/index, fonts, sysimg, LUTs, tables, armies
+0042471a	game_shutdown	free everything, restore autorun key, ExitProcess
+00423b00	cfg_load	read SUPERSP.CFG (DEVICE/VOLUME/CDDA/SET/Version)
+00423eb9	cfg_save	write SUPERSP.CFG
+00424122	ui_strings_load	BIN 5 (6 = mainland) string table -> DAT_00494768
+0042422b	bin10_tables_load	BIN 10 tables; sets DAT_0049456c constants block
+00430244	save_scan_headers	scan save\uj00..52.sav headers into DAT_00494870 (53x50)
+0041a370	play_opening_movies	ANI 1 and 2 if movies enabled
+0040d7e1	title_menu	title screen; returns state code
+0040de96	difficulty_menu	new game difficulty select; sets DAT_00494684
+0040e5db	vs_setup_menu	two-player battlefield/army setup
+0041a456	newgame_start	prologue stage, route select via flag 0x28, first stage, narration
+0041a583	run_script_stage	load stage, draw, run turn-1 scripts, free (prologue)
+0040ff7d	between_stages	next stage: story stage directly or world map/town/deploy
+0040fa1d	cave_stage_setup	set up alternate (cave) stage and deploy
+0040d729	adaptive_difficulty	shift enemy strength from army strength and difficulty
+0041a779	ending_sequence	ending texts, movies 4/5/3, rank from flags 0x48..0x4f
+00410763	town_hub	town hotspots: inn, shop, church, enter battle
+004109b3	inn_menu	inn hotspots: map, keeper, load, save, equip, status, items, quit, settings, auto-equip
+00410886	shop_hub	shop hotspots: weapons, armour, items, sell
+00410d3a	shop_buy	buy flow for shop kind 1..3
+00412b55	shop_sell	sell flow
+00410c21	church_menu	church hotspots: donate, revive, class change
+00410060	hotspot_menu	picture with clickable rects + hover labels
+00415fd2	world_travel_and_deploy	travel animation on world map, disc pick, deployment screen
+0040fd3c	worldmap_load	load DAT 11..17 pictures, BIN 4 locations, centre scroll
+00422f83	stage_record_read	read 30-byte BIN 1 stage record
+00423033	stage_load	load stage header/units; mode 10 sets turn/next stage
+00431ca5	narration_typer	stage intro text typewriter (modes 0/1/2)
+004188ca	map_dialogue	battle-map speech box per event line (portrait, name, tail)
+00418e73	dialogue_text	dialogue text typer (D%02x/W%02x codes)
+00417a1d	script_run_turn_events	run stage events for the current turn
+0042cc2c	map_menu	battle map menu: conditions, overview, system, auto, end turn, retreat
+0042d7cc	system_menu	load/save/settings/quit
+0042efcd	settings_open	settings panel CEL2 0xca; writes cfg when opened from title
+0042deda	settings_screen	sliders and toggles of SUPERSP.CFG SET=
+0042f033	overview_menu	總檢表: review units / map
+00430405	saveload_screen	save/load/army-pick slots (modes 0..3)
+004322bc	load_game_menu	scan + load screen; returns 7/8
+0042c663	yes_no_dialog	confirm box; honours 確定詢問 unless forced
+00431f6d	message_box	parchment box with centred text, optional wait
+00432054	banner_box	3-piece stretched banner with text
+0046d8a8	click_to_continue	blinking prompt following the mouse, optional timeout (cs)
+0046d81f	wait_key	wait for key/mouse down or timeout (cs)
+0046d390	palette_set	set 6-bit palette and re-present
+0046d442	palette_fade	fade in (dir 0) / out (dir 1); speed<0 = step size
+0046d2da	palette_cycle_tick	rotate palette ranges 3/11/19 by their periods
+0046d5d6	ticks_cs	centiseconds from local time (min*6000+sec*100+cs)
+0046d626	wait_until_cs	busy wait until |t0-now| >= n cs
+0046d652	sleep_cs	wait n cs
+0046d688	still_waiting_cs	|t0-now| < n
+0046e998	screen_alloc_pages	640x480 surface with n pages
+0046eb02	screen_set_page	select current draw page
+0046eb48	screen_present	present current page (cursor bracketed)
+0046eb8a	screen_present_page	present page p
+0046ec3c	screen_page_ptr	current page buffer
+0046ec54	screen_page_ptr_n	page p buffer
+0046ec6b	screen_copy_page	copy page src -> dst
+0046ecc2	screen_clear	clear current page
+0046f629	blit_raw	raw image blit (opaque flag)
+0046f02f	blit_rle	RLE image blit (opaque flag)
+0046ed81	blit_tagged	tag byte 0 = RLE else raw
+0046fad2	draw_pixel	
+0046fb13	draw_hline	(y, x0, x1, c)
+0046fb6c	draw_vline	(x, y0, y1, c)
+0046fbd3	draw_rect	outline or filled
+0046f907	grab_rect	copy rect into raw image (clipped)
+0040f08e	draw_bevel_box	fill 0xf0 with 0xfe/0xed/0x7d edges
+00420710	remap_buffer	apply LUT k to n bytes
+00420bf5	draw_window_shadow	8px LUT-6 shadow left/below a rect
+0045e3c7	build_remap_luts	13 blend LUTs at DAT_0049fe08
+0045e238	build_blend_lut	LUT k = nearest(mix(pal[t], pal[c], pct))
+0045dd6e	nearest_color	k-d tree nearest palette index in a box
+0045daaf	color_tree_build	k-d tree over palette for nearest search
+00420fab	pcx_load	PCX picture loader; id/kind -> archive entry
+00421f14	sysimg_load	resident UI images: DAT5[0..141] + CEL2[0..57]
+00421c97	subimage_load	load sub-entry i of an offset-table archive entry
+00422878	cel2_image_load	CEL2 image by sysimg-style id (id-0x8e)
+00422897	cel2_images_load	several CEL2 images by id
+00422551	dat7_image_load	DAT 7 image (1-based)
+0042267c	dat7_images_load	several DAT 7 images
+0041df60	text_small	8/16 px font text (fg, c2, target, style)
+0041f748	text_large	16/24 px font text
+0041deeb	text_number	printf %d..%5d in small font
+0041f87c	text_block	wrapped large-font text, '*' breaks
+0041e2e0	text_set_defaults	set fg/c2/target
+004751a0	msg_pump_one	translate one Windows message into an input event
+00474aac	input_get	pump + pop first event matching mask
+00474bb9	input_peek	pump + peek first event matching mask
+00474c54	input_flush	drain events matching mask
+00474c79	input_wait	block until event matching mask
+00472f69	input_get_w	wrapper of input_get
+00472f9e	input_flush_w	wrapper of input_flush
+00472fb2	input_wait_w	wrapper of input_wait
+004198a4	music_keepalive	per-loop CD music restart check
+00433ac7	cursor_draw	restore save-under (opt), save, draw cursor shape
+004339cc	cursor_capture	save-under at cursor position
+00433a1f	cursor_erase	restore save-under
+0043399f	cursor_draw_present	set shape (opt), draw cursor, present
+00433985	cursor_set_shape	current shape = sysimg index
+004338f1	cursor_warp	SetCursorPos in client coords
+00433a6b	cursor_enable	software cursor enable counter
+0043387a	os_cursor_show	ShowCursor counter around presents
+00475780	pal_rotate	rotate palette range (dir 1 = up)
+004758c3	pal_scale	set entries = src*level/255
+00423737	load_kindsp	KINDSP/DAT4: classes, actions, type matrix
+004239c9	load_itemsp	ITEMSP/DAT1 items (38-byte records)
+004242f2	load_itemhelp	ITEMHLSP/DAT3 help strings, index = item id
+00423a58	load_terrain	DAT6 terrain names + per-class cost/atk/def
+0045e4cf	load_spells	BIN2 spell table + school/status names
+004233d1	read_class_base	BIN8 50-byte class base record
+0042345b	class_growth	BIN8 growth: 9 stat gains for (class, level)
+00423607	growth_roll	sqrt(d0/d1*L)+d2/d3+rnd(d4+1)/(rnd(d5+1)+1)+0.5
+0042422b	load_params	BIN10 per-spell bytes, effect sounds, formula constants
+0040fd3c	worldmap_load	DAT11-17 PCX + BIN4 stage positions
+00422b8e	load_stage	BIN1 stage header+block, sets up script
+0040f418	load_vs_stage	FSTAGE.BIN stage
+0040f1aa	load_vs_titles	FSTAGE.BIN stage titles
+0043e018	unit_from_placement	101-byte placement record -> unit struct
+00429336	map_load	PRG6 battle map
+004297f5	map_load_tiles	per-map tile remap tables
+00429070	map_load_attrs	PRG7 tile attribute words
+004255da	map_height	cell height with edge rules
+00427e1f	terrain_passage	movement/terrain effect of a cell for a unit
+00420fab	pcx_load	PCX decoder (kind, -id), palette >>2
+00409642	combat_forecast	expected hit/damage for attack+counter
+0040881a	attack_strike	attacker hit roll + damage
+00408bae	counter_strike	counterattack hit roll + damage
+0040a080	damage_modify	type matrix, power, soft cap, defensive statuses
+00409f0b	hit_mods	weapon/action hit, evasion items
+00409e98	desperation	stat boost at low HP
+0040a2ed	damage_divisor	random 100..149 variance
+004078df	hit_scale	hit*(P2+rnd(P3+3))/10, difficulty
+0040797f	damage_scale	dmg*(P0+rnd(P1+3))/10, difficulty
+00407d91	difficulty_scale	*(100+P[0xf3+diff])/100 for enemy army
+0046d776	pct	permutation table roll 0..99
+0046d7ca	rnd	rand()%n with periodic reseed
+0046d6b5	pct_init	shuffle 0..99 table
+0047abfd	crt_rand	MSVC rand
+0046932f	spell_power	formula switch on spell+0x14
+00468d53	spell_damage_mods	terrain/status/element modifiers
+00467fe9	spell_hit	spell hit chance
+00468b0d	spell_value	value by effect code
+00462144	spell_apply_status	status effects of a spell hit
+00408fc9	hit_exp	EXP for one hit/kill
+00452e38	award_exp	EXP award + popup
+004537da	level_up	level-up loop
+00453725	try_level_up	
+00455d95	class_change	轉職
+00455c85	can_class_change	item/flag requirements
+0045781c	unit_rating	strength rating (強度)
+00452af0	ai_prof_floor	weapon proficiency floor for AI
+00456c88	apply_stat_gains	add 9 stat gains with caps
+0043c32d	recalc_buffs	current stats = base + buffs
+004470e7	unequip	remove item from slot
+00446d1a	equip_stats	add item stats
+0043ab32	has_ability	equipped passive ability check
+004312c4	save_write	SAVE\UJnn.SAV writer
+00430244	save_scan	read slot descriptions
+00442ef8	army_write	army serializer
+0041745a	script_state_write	script flags serializer
+00453608	kill_rewards	kill EXP bonus and drops
+0042b097	treasure_collect	unopened treasure spots at stage end
+0045f78b	spell_ap_cost	AP cost of casting
+00421f14	ui_images_init	DAT5 (ids 1..142) + CEL2 ids 143..200 preload into DAT_00493848[]
+00422897	ui_images_load	load CEL2 UI images by id (id-0x8e)
+00422551	dat7_image_load	load one DAT7 flagged image
+0042227c	portrait_index_open	open CEL3 and read its offset table
+00422353	portraits_load_dialogue	CEL3 entry 2n-2 (100x124)
+0043fa24	army_portraits_load	CEL3 entry 2n-1 (92x111) per army member
+0043d46b	unit_sprite_index_load	PRG1/PRG2 + CEL4/CEL5 frame tables
+0043e83e	unit_sprite_frames_load	page in frames + 200-byte action block per type
+0043eef6	summon_sprite_frames_load	CEL4/CEL5 ("invoke.ind"/"invsoke.cel")
+0043a34f	unit_frame_decode	RLE frame -> unit+0xad buffer, dx -> unit+0xac
+0043a1fe	unit_set_action	unit+0x2c = action string offset
+00429336	map_load_def	PRG6 map header, cells, objects, flags
+004297f5	map_load_tile_usage	per-map tile usage tables
+00429070	map_tile_attrs_load	PRG7 tile attributes
+00428b6a	map_tiles_page_in	load used PRG3/4/5 tiles
+00428a18	map_flag_row_index	first flag record per row
+00424d81	map_build	backdrop, rows, foreground, doors
+00425075	map_render_rows	objects + cells row by row
+00429ba2	map_draw_cell	ground column + overlay
+00429cf9	map_draw_objects_row	objects whose base row is reached
+00429d91	map_draw_objects_tail	objects below the last row
+00429e2f	map_redraw_front_overlays	overlays in front of an object
+00426417	map_occlude_sprite	cut sprite by scenery in front
+0042a30c	map_occlude_ring	cells k+1 rows in front
+0042a5af	map_occlude_by_cell	ground column/overlay of one cell
+0042a7da	map_occlude_by_objects	large objects in front
+0042aba8	map_doors_check	category 0xc tiles vs stage state
+0042ae85	map_doors_draw	draw category 0xc tiles
+0041fba0	sprite_cut	clear sprite pixels under mask (mode 1 = checkerboard)
+0041fdd0	sprite_cut_noshadow	same, mask colours 0x20/0x21 ignored
+0046fe5f	blit_raw_shadowed	raw blit; 0x20/0x21 darken via tint tables 6/4
+0046f629	blit_raw	raw blit; param 1 = opaque
+0046ed81	blit_flagged	flag byte: 0 RLE else raw
+0042665a	map_draw_unit	unit frame bottom-centred on its tile
+00427a10	map_cell_to_screen	cell -> screen with scroll and elevation
+00425562	map_cell_index	1-based index of a playable cell, 0 if off-map
+004255da	map_height_at	cell height byte
+00425f1a	map_flag_lookup	cell flag record index
+0042532b	map_ground_tile	ground tile pointer by global id
+00425401	map_overlay_tile	overlay tile pointer by global id
+0042546e	map_object_image	object image pointer by global id
+0042572f	map_object_front_rows	PRG7 object attribute
+0042b030	map_draw_backdrop	PRG8 image onto the map surface
+00421c97	res_read_subentry	read sub-entry i of an offset-table entry
+00420fab	pcx_load	PCX from an archive entry (+palette >>2)
+00459566	flc_play	cutscene player
+0045ac5a	flc_header_deobfuscate	swap/subtract header fields
+004593dd	cutscene_table_load	BIN7 21-byte record + events
+0045a355	flc_color256	
+0045a456	flc_color64	
+0045a557	flc_delta_flc	word runs fill low byte only
+0045a77a	flc_delta_fli	
+0045aa37	flc_byte_run	
+0045daaf	colortree_build	k-d tree over master palette
+0045dc15	colortree_insert	
+0045dd6e	colortree_nearest	windowed nearest colour
+0045e0fa	colortree_set_range	allowed index range
+0045e041	palette_nearest_grey	index nearest (31,31,31)
+0045e123	color_blend	src*p + dst*(100-p), nearest colour
+0045e238	tint_table_build	DAT_0049fe08 + k*256
+0045e3c7	tint_tables_init	13 tint tables, range 0x20..0xfe
+0046b5aa	fx_pixels_literal	effect translucency (literal run)
+0046b3e8	fx_pixels_fill	effect translucency (fill run)
+0046b4dd	fx_pixel	effect translucency (one pixel)
+00466507	fx_play	play a CEL1 effect on a cell
+0046d442	palette_fade	fade in/out, 64 steps
+0046d390	palette_set	6-bit palette -> DirectDraw (<<2)
+004758c3	dd_palette_scale	entries * level / 255
+0046d5d6	time_cs	centiseconds since the hour
+0046d626	wait_cs	busy-wait n centiseconds
+0041a01c	sfx_load	BIN17 RIFF WAV n
+0041a152	midi_load	BIN18 XMIDI n
+0046d776	rand100	perm[rand()%100], reseeds with time every 200 calls
+0046d7ca	randn	rand()%n (0 if n==0)
+0046d6b5	rng_init_perm	build shuffled 0..99 permutation
+0046d5d6	ticks_cs	centisecond clock (min*6000+sec*100+ms/10)
+0046d626	wait_cs	busy-wait until |t0-now| >= n centiseconds
+0040d108	stage_loop	turn loop: upkeep, player phase, enemy phase, end checks
+004323a3	player_phase	player input loop
+0043310e	enemy_phase	ai_phase(enemy army)
+00433db9	ai_phase	AI loop over units (mode 0 all, 1 npc/berserk)
+00433e6e	ai_next_unit	pick next AI unit by distance
+0043311d	check_battle_end	0 / 1 victory / 2 defeat
+00433161	check_defeat	stage defeat conditions
+00433257	check_victory	stage victory condition groups
+0044e99d	army_condition	all dead / boss dead / char dead checks
+0045cbf8	unit_on_exit	protagonist/any unit on overlay class 6
+00433831	turn_upkeep_both	start-of-turn upkeep for both armies
+0045ad90	army_upkeep	tick statuses, regen, poison
+00440e71	army_phase_reset	act=0, AP refill with carry
+0045b29d	army_terrain_effects	end-of-phase overlay effects
+004447e6	army_ai_wake	ai_mode 31..150 wake triggers
+00433453	phase_banner	player/enemy phase banner animation
+004346cb	select_unit_at	select unit at cursor and run command loop
+00434893	unit_command_loop	command menu handling for one unit
+00435a82	build_command_menu	compute available commands
+00436537	cmd_attack	choose target then attack
+00436b24	ai_attack	AI attack incl AP cost
+00436e46	attack_execute	full attack sequence with on-hit, deaths, exp
+00437b9c	counter_phase	defenders counter-attack
+00438c92	apply_on_hit_effects	statuses inflicted by hits
+00439e2a	apply_hp_change	animated damage/heal on a unit
+00439cc0	show_miss	floating miss/number popup
+004069d1	targetlist_ctor	TargetList init
+00406a36	targetlist_build	attack range + targets for a skill
+00406d0c	targetlist_rays	4-ray range
+00406f27	targetlist_ring	ring range
+0043b464	skill_range	min/max/shape from weapon or skill
+00408078	duel_setup	counter skill pick + forecast
+00409488	duel_pick_counter	random usable counter skill, facing
+00409642	duel_forecast	expected hit/damage both ways
+0040881a	duel_roll_attack	attack hit+damage roll
+00408bae	duel_roll_counter	counter hit+damage roll
+004080b0	facing_relation	1 front 2 side 3 back
+00409e98	desperation_acc	accuracy mod by HP lost
+00409f0b	hit_modifiers	weapon hit, evasion, abilities
+0040a080	damage_modifiers	affinity, power, soft cap, shields
+0040a2ed	random_divisor	damage divisor ~100..149
+004091ab	roll_crit	critical check attacker
+00409213	roll_crit_counter	critical check counter
+0040927b	crit_chance	crit percentage
+00409094	roll_instant_death	instant kill check
+004083c4	status_proc_check	AI: would inflict status
+004082e4	duel_expected	AI expected value of attack
+00408354	duel_expected_counter	AI expected value of counter
+00408fc9	exp_gain	EXP for damage/kill
+00453608	kill_bonus	bounty exp and item drops
+00452e38	award_exp	EXP + items with popups
+00453725	check_level_up	level up if exp >= next
+004537da	level_up	apply level-ups
+0042345b	roll_growth	9 stat growth rolls for class/level
+00423607	growth_formula	trunc(sqrt(a/b*lv)+c/d+r1/r2+0.5)
+004233d1	class_base_stats	class base record from BIN 8
+00456c88	apply_growth	add growth to stats with caps
+00452da5	weapon_prof_gain	+1 proficiency
+0045781c	unit_power	power rating P1..P4 and total
+00407d91	difficulty_scale	enemy-side % scaling
+004078df	vary_hit_phys	variance pair 2/3, clamp 1..99
+0040797f	vary_dmg_phys	variance pair 0/1
+00407aaa	vary_dmg_spell	variance pair 4/5
+00407a0a	vary_hit_spell	variance pair 6/7
+00407bd7	vary_amount_support	variance pair 8/9
+00407b37	vary_hit_support	variance pair 10/11
+00407d04	vary_amount_heal	variance pair 12/13
+00407c64	vary_pair14	variance pair 14/15
+00407880	vary_exp	exp * (c10+3+c11)/10
+00407dd9	ai_offer_candidate	compare AI candidates
+0040a443	ai_act	per-unit AI entry
+0040a4d0	ai_dispatch_mode	AI mode switch
+0040aadc	ai_fight	AI attack/spell search loop
+0040b740	ai_best_attack_target	score attack targets
+0040bc9e	ai_target_reachable	any target reachable this turn
+0040c424	ai_assess	0 danger 1 threatened 3 safe
+0040c5d8	ai_strong_enemy_near	enemy power > ours/3 nearby
+0040c459	ai_can_be_reached	strong enemy reaches us next turn
+0040a8fa	ai_approach	approach behaviour
+0040cb85	ai_decide_close	approach/flee decision
+0040cc56	ai_close_in	move toward nearest enemy keeping AP
+0040bf6a	ai_retreat	flee to farthest cell
+0040c18d	ai_find_flee_cell	cell maximizing enemy distance
+0040c0b3	ai_keep_away	mode 4
+0040cd2a	ai_go_to_point	modes 6/7 map goals
+0040aa76	ai_step_toward	cautious approach step
+0040c847	ai_fit_to_advance	HP/MP/ST thresholds by class type
+0040ca2d	ai_should_retreat	weighted HP threshold
+0040c804	ai_hp_critical	HP <= 29%
+004709dc	moverange_build	movement flood fill root
+00471bda	moverange_expand	recursive 4-neighbour expansion
+00471e51	moverange_try_step	step cost/legality
+00472403	moverange_improve	replace worse existing node
+0047152e	moverange_path	build path to node
+0047164d	moverange_closest_to	reachable node closest to target
+00471923	moverange_cautious_step	AI cautious destination
+00470c27	moverange_find_stop	node index if can_stop
+00472d46	grid_distance	staggered ring distance
+004414df	adjacent_enemies	ZOC: enemies adjacent within height window
+00427e1f	terrain_query	passability and (cost,atk,def)
+004255da	map_height	cell height
+00427a10	map_cell_to_screen	cell -> screen px
+00425879	map_screen_to_cell	mouse picking
+0042681e	map_center_on	scroll view to cell
+00426fdb	map_scroll_key	scroll by key code
+0042b72e	map_input	input to command code
+0044c240	cmd_move	player move command
+0044cd52	move_pick_dest	destination picking loop
+0044cccd	move_execute	walk along path
+0044c331	move_walk_anim	walk steps, set AP
+0044d7c1	cmd_rest	rest/wait with facing
+0044e210	ai_end_action	face, rest, mark done
+0044e460	rest_heal	10-20% HP/MP/ST
+0044e37d	face_nearest_threat	auto facing
+0044d14b	unit_die	death/retreat handling
+00440b16	army_unit_at	unit id at cell
+0043aa26	unit_move_type	0 ground,1 lev,2,3,4 fly,5
+0043ab32	unit_has_item_ability	equipped item ability check
+0043c727	unit_can_act	alive and not incapacitated
+0043c76c	unit_can_counter	not incapacitated
+0043aad7	unit_is_hidden	invisible to opponent
+0043a7ea	unit_can_move	AP enough to move
+0043a522	unit_can_promote	class change available
+0043ce32	unit_knows_skill_kind	magic/technique known
+0043c8bb	status_apply	set status bit with duration
+0043cb09	buffb_apply	5-byte buff with atk/def delta
+0043cbf0	apply_poison	poison buff
+0043cc3c	apply_petrify	petrify buff
+0043ccc5	apply_berserk	berserk buff
+0043c992	dispel_one	remove first positive effect
+0043abc2	army_recalc_flags	aggregate army flags
+0045f6cf	cmd_magic	magic menu
+0045f72d	cmd_technique	technique menu
+0045f78b	spell_pay_cost	AP + MP/ST/HP costs
+0045ff9e	spell_execute	apply effects, learning, exp
+00460b73	spell_damage_area	damage spells
+00460c85	spell_damage_unit	damage one unit
+004606d3	spell_heal_area	heals
+004608e2	spell_summon	create summoned unit
+00460fd0	spell_support_area	buffs/debuffs dispatcher
+0046136c	spell_ally_effect	ally buff switch
+00462144	spell_enemy_effect	enemy debuff switch
+00462c42	spell_all_effect	all-unit effect switch
+00467f96	spell_chance_amount	(chance, amount)
+00467fe9	spell_chance	hit chance
+004683f2	spell_magic_vs	magic vs magic %
+00468822	spell_tech_vs	technique vs %
+00468b0d	spell_amount	amount by effect
+0046932f	spell_power_formula	power formula switch
+00468d53	spell_damage_mods	element, facing, shields
+0046ae25	spell_duration	duration code
+0046c85b	spell_damage_roll	damage with miss roll
+0046552e	combo_find_partner	adjacent partner
+0046570c	combo_partner_ok	partner knows skill, affinity
+0046586d	spell_cost_check	enough MP/ST/HP/AP
+0046b890	ai_consider_spells	AI spell evaluation
+0040576b	ai_spell_best_cell	AI spell targeting score
+0046be92	ai_spell_useful	support spell usefulness filter
+0046bb67	ai_cast_spell	AI casts chosen spell
+00447490	cmd_items	use/equip item entry
+0044a619	item_use_effect	consumable effects
+00453986	cmd_class_change	promotion UI
+00455c85	class_change_eligible	hidden class requirements
+00455d95	class_change_apply	apply promotion
+0045d713	victory_bonus_exp	+30 exp survivors
+0045cfad	battle_rewards	victory rewards and treasure
+00441038	cmd_end_turn	all remaining units rest
+00433b80	select_next_ready	cycle to next unit
+00440fa1	army_all_done	no ready units left
+004576f7	facing_toward	facing to a cell
+00457578	army_find_char	unit by char id
+00457644	army_find_tag	unit by tag (+6)
+00434138	army_nearest_enemy	nearest enemy (power filters)
+004411cf	set_combat_context	bind Duel/SpellCaster/AiCtl to armies
+0043e018	unit_init_from_def	fill unit from 0x65 definition
+0041bc3b	after_victory_media	movie flag 30, picture flags 27..29
+0041bd04	touched_clear	clear touched event-tile list DAT_00492cbc
+0041bd13	touched_add	add event tile id (max 0x28)
+0041bd98	touch_cell	add map cell event id to touched list
+0041be02	touched_contains	type 9/7 test
+0041bdeb	touched_is_empty	
+0041bca5	cursors_save	save spell cursor to DAT_00492cb4
+0041bcb9	cursors_restore	restore duel/spell/AI cursors
+0042441d	newgame_counters	fame = P[0xf9], rating = P[0xfa], battles = 0
+004593a0	movie_wait_skippable	wait n cs; abort on key/mouse down
+00426267	map_cell_visible	cell inside the view (mode 2 = with margin)
+00426905	map_scroll_to	step-wise scroll until the cell is in view
+00442da4	army_center_first	centre view on the army's first live on-map unit
+00442caa	army_unit_screen_pos	speaker cell (or army leader), scrolled into view
+00424c5f	map_draw_view	copy 640x480 of the map surface to the current page
+004252c9	map_draw_present	page 0 + map + cursor + present
+004231be	deploy_turn_units	create units whose appear window contains the turn
+00431154	autosave_turn1	save slot 51 on turn 1
+0043117c	autosave_turn	save slot 52 every turn
+0041b963	picture_with_text	PCX picture + scrolling epilogue text
+0040927b	crit_chance	crit % (attack/counter), 1..50
+004091ab	roll_crit_attack	
+00409213	roll_crit_counter	
+00409094	instant_death	50% undead slayer / 5% ability 0x200
+00409e98	desperation	71..90 / >90 HP lost
+004683f2	magic_vs	magic contest; kind 0 returns base chance (asm)
+00468822	tech_vs	technique contest
+0045f145	spell_listed	menu filter: one summon, combo partner
+0046552e	combo_partner	4 neighbours
+0046570c	partner_at	learned + height<4 + affinity>69 for couples
+0046586d	spell_shortage	0 ok 1 MP 2 ST 3 AP 4 HP
+00457301	special_learn	school 7 idx 5..10 need learned[idx-5]
+00460b73	cast_damage	
+00460c85	cast_damage_cell	
+004606d3	cast_heal	
+004608e2	cast_summon	
+00460fd0	cast_status	
+0046136c	effect_ally	
+00462c42	effect_any	
+00463c84	spell_exp	
+00463b44	spell_kill_rewards	
+004630ab	spell_wake	wake + 71% cure paralysis
+0046c85b	spell_damage_roll	
+0043c992	dispel_one	
+0043a5d3	item_equippable	
+0043a748	weapon_usable	
+0043cf34	alignment_masks	sex 8/0x10/0x20, alignment <31/<70/>=70 -> 1/2/4
+00446fe6	equip_item	
+0044bd12	auto_equip	
+0044bf12	consume_equipped	
+0044a619	use_item	
+0044bfb2	learn_school_range	
+0044b725	transform_stats	
+0044b41b	item_slay_random	
+0044b594	item_quake	
+0043a522	promotion_available	
+00455d21	consume_change_item	
+00453986	promotion_menu	
+004010ce	spell_target_init	SpellTarget DAT_00492a68: spell, mode, caller, from_item
+004010ff	spell_target_range	range diamond around the caster (−1: every visible unit)
+004014d7	spell_target_all_units	range = every visible unit of both armies
+0040145c	spell_target_free	
+00401573	range_has_foe	visible enemy on a range cell (skipping the caster's)
+004015d4	range_has_own	
+00401634	spell_aim_loop	cursor loop over the range (UI)
+00401a4b	spell_cursor_unit	unit shown in the target panel
+00402213	in_range_or_area	
+004022b6	in_area	
+00402310	spell_target_area	area at the cursor by shape (+0x12) / effect
+0040284d	teleport_area	free cells within 魔力/10+1 of the chosen unit
+00402dc9	summon_area	first free neighbour of the caster
+00403262	spell_area_free	
+004032c1	spell_ray	one ray (shape 5)
+00403427	spell_cross	four interleaved rays (shapes 5/6 area)
+004036f2	spell_screen_area	shape 7: the visible window
+0040391b	spell_cones	shape 8: four cones
+00403a18	spell_cone	one cone, start/len at +0x6b/+0x6c
+00403ce9	cone_push	
+00403d91	area_has_foe	
+00403df2	area_has_own	
+004041d7	spell_confirm_loop	checks + confirm loop (UI)
+0040507b	spell_area_count	
+004050bc	spell_area_reset	
+00405105	spell_area_next	
+004051b3	next_foe_in_area	
+004052e3	teleport_pick_loop	destination loop (UI)
+004055a4	aim_ai_cast	
+004059a6	ai_score_area_damage	
+00405ebe	ai_score_line_damage	
+004063c4	ai_score_support	
+004065d3	ai_score_heal	
+004067e1	item_aim	
+0040684c	item_amount	
+0040bf2f	ai_low_resources	
+0042855a	map_valid_target_cell	ground ≥ 2, no 0x8000 spot
+004282e6	map_can_stand	class terrain test without move modifiers
+0042890a	map_find_goal	nearest object class cell
+00433fa8	nearest_idle_distance	
+00434045	nearest_ready_reachable	
+00434189	nearest_of	
+004342d9	free_neighbour	
+0043cd7f	command_kind	
+00458283	longest_reach	
+0045f212	spell_list_magic	
+0045f3b0	spell_list_tech	
+0046b84e	ai_spell_probe	
+0046bd93	summon_slot_free	
+0046be07	support_value	
+0043297f	vs_phase	one human side's phase in a VS battle
+0040f3b1	vs_stage_list_free	
+0040f67f	vs_start	globals, armies from two saves, comparison screen
+00443482	army_from_save	read a save's player army and place it on records

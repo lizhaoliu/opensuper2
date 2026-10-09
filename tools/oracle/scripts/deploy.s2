@@ -1,0 +1,54 @@
+#! saves after1
+# Deployment by keyboard ("after1" fixture, stage 2): Tab focuses the cards,
+# Right picks the next member, Enter places it (arrow keys move the cursor,
+# Enter confirms, then the facing box), Tab to the buttons, start the battle.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 500
+key RETURN
+frames 300
+key RETURN
+frames 300
+shot deploy
+key TAB
+frames 30
+shot focus
+key RIGHT
+frames 30
+shot member2
+key RETURN
+frames 200
+shot placing
+key LEFT
+frames 30
+shot cursor_left
+key UP
+frames 30
+shot cursor_up
+key RETURN
+frames 150
+shot facing_box
+key RETURN
+frames 200
+shot placed
+key TAB
+frames 30
+shot buttons
+key RIGHT
+key RIGHT
+frames 30
+shot start_button
+key RETURN
+frames 300
+shot battle1
+key RETURN
+frames 300
+shot battle2

@@ -1,0 +1,56 @@
+#! saves revive
+# Church with two members dead ("revive" fixture): the temple's revive list,
+# reviving one, a donation, then saving to slot 2 (compared byte for byte).
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+shot town
+click 502 337
+frames 300
+shot church
+click 325 352
+frames 200
+shot temple
+move 275 287
+frames 60
+shot temple_hover
+click 275 268
+frames 150
+shot revive_prompt
+key RETURN
+frames 200
+shot revived
+rclick 320 240
+frames 200
+shot church_back
+click 119 348
+frames 200
+shot donate
+key 1
+key 0
+key 0
+frames 30
+shot donate_typed
+key RETURN
+frames 200
+shot donated
+rclick 320 240
+frames 300
+rclick 320 240
+frames 300
+shot town_back
+click 298 253
+frames 200
+click 492 239
+frames 200
+click 320 95
+frames 200
+shot saved

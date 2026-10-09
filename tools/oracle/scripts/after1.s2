@@ -1,0 +1,52 @@
+#! saves after1
+# From the "after1" fixture (between stages 1 and 2): load, the march on the
+# world map, the stage-2 narration, the deployment screen and the battle start.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 100
+shot march1
+frames 100
+shot march2
+frames 200
+shot march3
+key RETURN
+frames 200
+shot narration1
+key RETURN
+frames 200
+shot narration2
+key RETURN
+frames 200
+shot deploy
+move 205 95
+frames 60
+shot deploy_hover
+click 205 95
+frames 100
+shot deploy_toggle
+click 67 228
+frames 150
+shot deploy_auto
+click 180 228
+frames 200
+shot deploy_view
+rclick 320 240
+frames 200
+shot deploy_back
+click 293 228
+frames 300
+shot place
+key RETURN
+frames 300
+shot place2
+key RETURN
+frames 300
+shot start

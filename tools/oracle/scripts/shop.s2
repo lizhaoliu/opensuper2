@@ -1,0 +1,75 @@
+#! saves town
+# Shops and church from the "town" fixture: buy lists, a purchase prompt,
+# selling, donation, the temple (revive) and class change.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+click 151 321
+frames 200
+shot shop
+click 257 370
+frames 200
+shot buy1
+move 275 328
+frames 60
+shot buy1_hover
+click 275 328
+frames 150
+shot buy1_pick
+rclick 320 240
+frames 150
+shot buy1_cancel
+rclick 320 240
+frames 200
+shot shop_back
+click 552 146
+frames 200
+shot buy2
+rclick 320 240
+frames 200
+click 310 175
+frames 200
+shot buy3
+rclick 320 240
+frames 200
+click 449 226
+frames 200
+shot sell
+move 222 328
+frames 60
+shot sell_hover
+rclick 320 240
+frames 200
+rclick 320 240
+frames 200
+shot town_back
+frames 300
+click 502 337
+frames 300
+shot church
+click 119 348
+frames 200
+shot donate
+rclick 320 240
+frames 200
+click 325 352
+frames 200
+shot temple
+rclick 320 240
+frames 200
+click 562 260
+frames 200
+shot classchange
+rclick 320 240
+frames 200
+rclick 320 240
+frames 300
+shot town_end

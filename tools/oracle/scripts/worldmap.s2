@@ -1,0 +1,61 @@
+#! saves town
+# World map from the inn (scrolling by keys and pointer, hovering places),
+# then leaving town: the march, the stage-3 narration and deployment.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+click 298 253
+frames 200
+click 517 118
+frames 300
+shot map
+key RIGHT
+frames 30
+key RIGHT
+frames 30
+shot map_keys
+key DOWN
+frames 30
+key DOWN
+frames 60
+shot map_keys2
+move 630 240
+frames 90
+shot map_edge
+move 320 240
+frames 60
+shot map_center
+move 200 200
+frames 60
+shot map_hover
+click 200 200
+frames 100
+shot map_click
+rclick 320 240
+frames 300
+shot inn_back
+rclick 320 240
+frames 300
+shot town
+click 187 449
+frames 300
+shot march1
+frames 300
+shot march2
+key RETURN
+frames 300
+shot march3
+key RETURN
+frames 300
+shot march4
+key RETURN
+frames 300
+shot march5
