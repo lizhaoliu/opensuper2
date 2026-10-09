@@ -50,6 +50,10 @@ oracle on a scratch copy).
 | `cave.s2` | the hidden-stage flow: stage 59 won by auto-battle, the 進入洞窟 prompt, the cave stage set up (narration, dialogue, objectives; autosaves compared) |
 | `cave_return.s2` | the cave stage won, victory dialogue, rewards, back between stages at the town, the world map |
 | `ending_r0.s2`, `ending_r1.s2` | each route's last stage from turn 15: the turn-16 withdrawal, the ending variant (flag 76 / 78), epilogues, record, staff page |
+| `ending_74.s2`, `ending_80.s2` | the same with the other branch flag: ending variants 74 / 80 |
+| `ending_73.s2` … `ending_79.s2` | after 克雷布特里 falls: stage 61 / 131 over at once (flag 4), the victory event's variant 73 / 75 / 77 / 79, the whole ending |
+| `classchange_battle.s2` | in-battle class change: Tab, the command row, 轉職, cards, confirm (growth rolls), sprite reload and wipe-in |
+| `inn.s2` | the inn's quit prompt, the equipment screen used (unequip, preview, re-equip), 自動裝備, saving (file compared) |
 | `combat.s2`, `battle_*.s2` | BATTLE's in-battle scripts (AI, combat, spells) |
 
 Besides the shots, compare.py compares every file the two programs wrote to
@@ -71,6 +75,8 @@ Fixture folders (`~/games/super2sp/dump/oracle/fixtures/`):
 | `cave` | route 0's stage-59 turn-1 autosave, cave-found byte set (campaign block +0x1a) |
 | `cave_return` | the cave stage 62's turn-1 autosave from cave.s2, five 魔頭 dead (DEAD set, DEPLOYED cleared), the last at 1 HP |
 | `ending_r0`, `ending_r1` | the last stage's (60 / 130) turn-1 autosave with the turn set to 15 |
+| `ending_74`, `ending_80` | ending_r0 with flag 42 set, 43 cleared / ending_r1 with 63 set, 64 and 65 cleared |
+| `ending_73` … `ending_79` | stage 61 / 131's turn-1 autosave (s2auto `--set-flag 60:15` / `130:15`) with story flag 4 and one branch flag (42 / 43 / 65 / 63) |
 
 `tools/oracle/make_fixtures.sh` creates missing fixtures: s2auto (route 0,
 seed 1) plays the first stages with `S2_TEST_SAVE=20`, a test hook in

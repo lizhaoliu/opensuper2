@@ -8,6 +8,10 @@
 #   cave_return          the cave stage 62's turn-1 autosave as cave.s2 writes it, five 魔頭
 #                        dead (DEAD set, DEPLOYED cleared) and the last at 1 HP
 #   ending_r0/ending_r1  the last stage's (60 / 130) turn-1 autosave with the turn set to 15
+#   ending_74/ending_80  ending_r0 with flag 42 set, 43 cleared / ending_r1 with 63 set, 64, 65 cleared
+#   ending_73/75/77/79   stage 61 / 131's turn-1 autosave (s2auto --set-flag 60:15 / 130:15 from
+#                        the last stage's) with story flag 4 set (the stage is over at once) and
+#                        flag 42 / 43 (route 0), 65 / 63 (route 1) as the only branch flag
 # One s2auto run per route (seed 1, --god --recover 3) with S2_TEST_SAVE=1 and
 # S2_TEST_SAVE_KEEP (flow/town.rs) keeps every between-stages save as between_<stage>.sav;
 # its turn-1 autosaves are turn1_<index>_<stage>.sav.
@@ -15,7 +19,7 @@ set -eu
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 GAME=${S2_GAME_DIR:-$HOME/games/super2sp/extracted/app}
 FIX=${S2_ORACLE_FIXTURES:-$HOME/games/super2sp/dump/oracle/fixtures}
-NAMES="classchange classchange_hidden cave cave_return ending_r0 ending_r1"
+NAMES="classchange classchange_hidden cave cave_return ending_r0 ending_r1 ending_73 ending_74 ending_75 ending_77 ending_79 ending_80"
 if [ "${1:-}" != "--force" ]; then
     missing=0
     for n in $NAMES; do [ -f "$FIX/$n/UJ01.SAV" ] || missing=1; done
@@ -66,6 +70,10 @@ elif what == "weak":
             struct.pack_into("<h", d, u + 0x124, 0)
         else:
             struct.pack_into("<h", d, u + 0x124, 1)
+elif what.startswith("flags:"):  # flags:+4,+42,-43 sets / clears story flags (block A, flag n at n - 1)
+    A = 9 + 0x32 + 0xff
+    for f in what[6:].split(","):
+        d[A + int(f[1:]) - 1] = 1 if f[0] == "+" else 0
 elif what != "copy":
     sys.exit("unknown edit " + what)
 open(dst, "wb").write(d)
@@ -76,6 +84,20 @@ patch "$tmp/keep0/between_048.sav" "$FIX/classchange_hidden/UJ01.SAV" hidden
 patch "$(turn1 0 59)" "$FIX/cave/UJ01.SAV" cave
 patch "$(turn1 0 60)" "$FIX/ending_r0/UJ01.SAV" turn15
 patch "$(turn1 1 130)" "$FIX/ending_r1/UJ01.SAV" turn15
+patch "$FIX/ending_r0/UJ01.SAV" "$FIX/ending_74/UJ01.SAV" flags:+42,-43
+patch "$FIX/ending_r1/UJ01.SAV" "$FIX/ending_80/UJ01.SAV" flags:+63,-64,-65
+# Stage 61 / 131: 克雷布特里 falls at once in the last stage (flag 15), the next stage's autosave.
+for r in 0 1; do
+    s=$([ $r = 0 ] && echo 60 || echo 130)
+    target/release/s2auto --game "$GAME" --out "$tmp" --route $r --god --from-save 1 \
+        --save-file "$(turn1 $r $s)" --set-flag $s:15 --max-stages 2 --retries 0 --run b$r >/dev/null || true
+done
+b61=$(ls "$tmp/b0/route0"/turn1_*_061.sav | head -1)
+b131=$(ls "$tmp/b1/route1"/turn1_*_131.sav | head -1)
+patch "$b61" "$FIX/ending_73/UJ01.SAV" flags:+4,+42,-43
+patch "$b61" "$FIX/ending_75/UJ01.SAV" flags:+4,+43,-42
+patch "$b131" "$FIX/ending_79/UJ01.SAV" flags:+4,+63,-64,-65
+patch "$b131" "$FIX/ending_77/UJ01.SAV" flags:+4,+65,-63
 # cave_return: the cave stage's turn-1 autosave (UJ51) as s2run writes it running cave.s2.
 "$REPO/tools/.venv/bin/python" -I "$REPO/tools/oracle/compare.py" --game "$GAME" --out "$tmp/cave" \
     --script-file "$REPO/tools/oracle/scripts/cave.s2" --port-only >/dev/null

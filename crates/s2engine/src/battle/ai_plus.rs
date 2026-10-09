@@ -24,6 +24,12 @@
 //!   reach, with its best expected hit), lowered by the cell's terrain
 //!   defence; deadly cells are avoided unless the action is worth it.
 //!
+//! - items: the army's consumables (HP / MP / cures) on itself or an ally in
+//!   the item's reach, as the item screen allows, at the item AP; the turn
+//!   ends there, so a hurt unit may first step out of the threat;
+//! - the best few candidates are re-ranked with the opponents' reply where
+//!   the unit ends up, without the units the action likely kills.
+//!
 //! With nothing worth doing it repositions: badly hurt units step out of the
 //! threat (toward allies); the others wait just outside the threat until
 //! enough allies are close to engage together (up to `HOLD_TURNS`), then
@@ -70,6 +76,8 @@ pub struct ThreatMap {
     pub sources: Vec<(UnitRef, i32)>,
     /// What loses the stage for the opponents (shown to the player too).
     pub goals: Goals,
+    /// The sorted cell indices each source reaches (aligned with `sources`).
+    cover: Vec<Vec<u32>>,
 }
 
 /// The stage's lose conditions as targets: characters whose death loses
@@ -108,6 +116,31 @@ impl ThreatMap {
     /// The expected hit of opponent `p` on the unit (0 if not a source).
     pub fn hit_of(&self, p: UnitRef) -> i32 {
         self.sources.iter().find(|s| s.0 == p).map_or(0, |s| s.1)
+    }
+
+    /// [`at`](Self::at) with the opponents in `gone` taken out (the reply
+    /// after an action that likely kills them).
+    pub fn at_without(&self, x: i32, y: i32, gone: &[UnitRef]) -> i32 {
+        if gone.is_empty() {
+            return self.at(x, y);
+        }
+        if x < 0 || y < 0 || x >= self.width || y >= self.rows {
+            return 0;
+        }
+        let k = (y * self.width + x) as u32;
+        let (mut a, mut b) = (0, 0);
+        for (i, &(p, hit)) in self.sources.iter().enumerate() {
+            if gone.contains(&p) || self.cover[i].binary_search(&k).is_err() {
+                continue;
+            }
+            if hit > a {
+                b = a;
+                a = hit;
+            } else if hit > b {
+                b = hit;
+            }
+        }
+        a + b
     }
 }
 
@@ -209,7 +242,7 @@ fn for_cells_within(width: i32, rows: i32, x: i32, y: i32, reach: i32, mut f: im
 pub fn threat_map(b: &mut Battle, me: UnitRef) -> ThreatMap {
     let (width, rows) = (b.map().width(), b.map().rows());
     let n = (width * rows).max(0) as usize;
-    let mut tm = ThreatMap { width, rows, dmg: vec![0; n], top: vec![(0, 0); n], sources: Vec::new(), goals: Goals::default() };
+    let mut tm = ThreatMap { width, rows, dmg: vec![0; n], top: vec![(0, 0); n], sources: Vec::new(), goals: Goals::default(), cover: Vec::new() };
     let saved_range = b.range.clone();
     let snap = b.rng.snapshot();
     let foe = me.side.other();
@@ -245,9 +278,12 @@ pub fn threat_map(b: &mut Battle, me: UnitRef) -> ThreatMap {
                 }
             });
         }
-        for k in hits {
+        for &k in &hits {
             tm.add(k, hit);
         }
+        let mut cov: Vec<u32> = hits.iter().map(|&k| k as u32).collect();
+        cov.sort_unstable();
+        tm.cover.push(cov);
     }
     b.range = saved_range;
     b.rng.restore(snap);
@@ -299,7 +335,7 @@ fn defence_here(b: &Battle, r: UnitRef) -> i32 {
 /// What standing on (x, y) at the end of the action costs `r` (in HP
 /// points): the expected damage there next turn after the terrain's
 /// defence, more when hurt, plus a penalty when it could be deadly.
-fn cell_cost(b: &mut Battle, r: UnitRef, tm: &ThreatMap, x: i32, y: i32, def_now: i32) -> f32 {
+fn cell_cost(b: &mut Battle, r: UnitRef, tm: &ThreatMap, x: i32, y: i32, def_now: i32, gone: &[UnitRef]) -> f32 {
     let (x0, y0) = (b.unit(r).x, b.unit(r).y);
     ai::set_pos(b, r, x, y);
     let def = defence_here(b, r);
@@ -307,7 +343,7 @@ fn cell_cost(b: &mut Battle, r: UnitRef, tm: &ThreatMap, x: i32, y: i32, def_now
     let u = b.unit(r);
     let hp = u.hp.max(1) as f32;
     let hurt = (u.hp as i32) * 2 < u.hp_max as i32;
-    let raw = tm.at(x, y) as f32 * (100 - def).clamp(10, 190) as f32 / (100 - def_now).clamp(10, 190) as f32;
+    let raw = tm.at_without(x, y, gone) as f32 * (100 - def).clamp(10, 190) as f32 / (100 - def_now).clamp(10, 190) as f32;
     // A leader (rank 1: its defeat usually wins the stage) keeps safer.
     let w = if hurt { 0.6 } else { 0.25 } * if u.rank == 1 { 2.5 } else { 1.0 };
     let mut c = 100.0 * raw.min(2.0 * hp) / hp * w;
@@ -317,8 +353,25 @@ fn cell_cost(b: &mut Battle, r: UnitRef, tm: &ThreatMap, x: i32, y: i32, def_now
     c - def as f32 * 0.3
 }
 
+/// Progress toward the stage's lose condition for the opponents from
+/// `expected` damage (kill chance `pk`) on `e`: a lose-condition character
+/// by the share of its HP, an escort by its share of the escorts left.
+fn objective(b: &Battle, tm: &ThreatMap, e: UnitRef, expected: f32, pk: f32) -> f32 {
+    let u = b.unit(e);
+    let w = 150.0;
+    let mut v = 0.0;
+    if tm.goals.chars.contains(&u.char_id) {
+        v += w * (expected / (u.hp as f32).max(1.0) + pk);
+    }
+    if tm.goals.escorts && u.npc == 1 {
+        let left = b.army(e.side).units.iter().filter(|o| o.npc == 1 && o.on_map()).count().max(1) as f32;
+        v += w * (pk + 0.3 * expected / (u.hp as f32).max(1.0)) / left;
+    }
+    v
+}
+
 /// The value of attack `du` on its defender (no position term).
-fn attack_value(b: &mut Battle, r: UnitRef, du: &super::combat::Duel, prio: f32, goal: bool) -> f32 {
+fn attack_value(b: &mut Battle, r: UnitRef, tm: &ThreatMap, du: &super::combat::Duel, prio: f32, goal: bool) -> f32 {
     let me = b.unit(r).clone();
     let e = b.unit(du.def).clone();
     let hit = du.calc.fc_hit.clamp(0, 100) as f32 / 100.0;
@@ -327,7 +380,7 @@ fn attack_value(b: &mut Battle, r: UnitRef, du: &super::combat::Duel, prio: f32,
     let emax = (e.hp_max as f32).max(1.0);
     let expected = hit * dmg;
     let pk = if du.calc.fc_dmg >= e.hp as i32 { hit } else { 0.0 };
-    let mut v = prio * (60.0 * expected / ehp + 40.0 * expected / emax + 140.0 * pk);
+    let mut v = prio * (60.0 * expected / ehp + 40.0 * expected / emax + 140.0 * pk) + objective(b, tm, du.def, expected, pk);
     if du.counter.is_some() {
         let chit = du.calc.fc_chit.clamp(0, 100) as f32 / 100.0;
         let cdmg = du.calc.fc_cdmg.max(0) as f32;
@@ -362,7 +415,8 @@ fn spell_value(b: &mut Battle, r: UnitRef, tm: &ThreatMap, cast: &Cast, area: &[
                 let dmg = val.clamp(0, eu.hp as i32) as f32;
                 let expected = chance * dmg;
                 let pk = if val >= eu.hp as i32 { chance } else { 0.0 };
-                v += prio * (60.0 * expected / (eu.hp as f32).max(1.0) + 40.0 * expected / (eu.hp_max as f32).max(1.0) + 140.0 * pk);
+                v += prio * (60.0 * expected / (eu.hp as f32).max(1.0) + 40.0 * expected / (eu.hp_max as f32).max(1.0) + 140.0 * pk)
+                    + objective(b, tm, e, expected, pk);
             } else if !heal_effect(effect) {
                 let (kind, _) = b.support_value(cast, foe, e);
                 if kind > 0 {
@@ -406,6 +460,8 @@ fn spell_value(b: &mut Battle, r: UnitRef, tm: &ThreatMap, cast: &Cast, area: &[
 enum Act {
     Attack { target: UnitRef, skill: usize },
     Spell(SpellPlan),
+    /// A consumable from the army's inventory on `target` (it ends the turn).
+    Item { target: UnitRef, id: u16 },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -416,6 +472,60 @@ struct Plan {
     gain: f32,
     /// `gain` with the cell's risk: what ranks the plans.
     value: f32,
+    /// Where the unit ends the action.
+    cell: (i32, i32),
+    /// An opponent the action likely kills (out of the reply).
+    kill: Option<UnitRef>,
+}
+
+/// The candidates re-ranked with the opponents' reply (`reply_rank`).
+const REPLY_TOP: usize = 5;
+
+/// HP / MP / cure items the AI uses, as a player would from the item screen.
+const ITEM_EFFECTS: [u8; 9] = [5, 0x21, 0x23, 6, 10, 0x22, 0x24, 0x25, 0x27];
+
+/// The value of item `id` on own unit `o` (0 when not needed).
+fn item_value(b: &Battle, id: u16, o: UnitRef) -> f32 {
+    let Some(it) = b.item(id) else { return 0.0 };
+    let u = b.unit(o);
+    let (hp, hpm) = (u.hp as f32, (u.hp_max as f32).max(1.0));
+    let urgency = if hp * 100.0 < hpm * 30.0 { 2.5 } else if hp * 2.0 < hpm { 1.8 } else { 0.8 };
+    match it.effect {
+        5 | 0x21 | 0x23 => {
+            let amount = if it.effect == 5 { (hpm - hp).max(0.0) } else { b.item_amount(id, o).max(0) as f32 };
+            if hp * 100.0 >= hpm * 60.0 {
+                return 0.0;
+            }
+            100.0 * amount / hpm * urgency
+        }
+        6 | 10 | 0x22 => {
+            let caster = known_spells(b, o).iter().any(|&(s, _)| {
+                let e = b.spell_aim(s as i32).effect;
+                heal_effect(e) || damage_effect(e)
+            });
+            if !caster || u.mp_max <= 0 || (u.mp as i32) * 100 >= (u.mp_max as i32) * 30 {
+                return 0.0;
+            }
+            25.0
+        }
+        0x24 if u.buffs & buff::POISON != 0 => 12.0,
+        0x25 if u.buffs & buff::PETRIFIED != 0 => 45.0,
+        0x27 if u.status & 0x0010_f000 != 0 => 25.0,
+        _ => 0.0,
+    }
+}
+
+/// The consumables of `r`'s army it may use (in stock, usable by it).
+fn usable_items(b: &Battle, r: UnitRef) -> Vec<u16> {
+    let inv = &b.army(r.side).inventory;
+    (0..inv.len())
+        .filter(|&i| inv[i] > 0)
+        .map(|i| i as u16 + 1)
+        .filter(|&id| {
+            b.item(id).is_some_and(|it| it.kind == 0xc && it.usage != 2 && ITEM_EFFECTS.contains(&it.effect))
+                && b.item_equippable(b.unit(r), id)
+        })
+        .collect()
 }
 
 /// Rank of an action of value `gain` ending on a cell costing `pos`: the
@@ -531,15 +641,17 @@ fn best_plan(b: &mut Battle, r: UnitRef, tm: &ThreatMap, limit: i32) -> Option<P
     let t = b.t();
     let skills: Vec<usize> = t.kinds.class(u.kind as u16).map_or(Vec::new(), |c| c.actions.clone().collect());
     let spells = castable(b, r);
-    let mut best: Option<Plan> = None;
-    let offer = |best: &mut Option<Plan>, p: Plan| {
-        if p.gain >= MIN_VALUE && best.map_or(true, |b| p.value > b.value) {
-            *best = Some(p);
+    let mut best: Vec<Plan> = Vec::new();
+    let offer = |best: &mut Vec<Plan>, p: Plan| {
+        if p.gain >= MIN_VALUE {
+            best.push(p);
         }
     };
+    let items = usable_items(b, r);
+    let item_cost = b.c(0xf1);
     let mut spell_cells: Vec<(f32, usize, i32, i32)> = Vec::new();
     for &(node, x, y, mark, ap_there) in &cells {
-        let pos = cell_cost(b, r, tm, x, y, def_now);
+        let pos = cell_cost(b, r, tm, x, y, def_now, &[]);
         ai::set_pos(b, r, x, y);
         if (node == 0 && (u.ap as i32) >= atk_cost) || (node > 0 && mark != 0) {
             for &k in &skills {
@@ -553,7 +665,7 @@ fn best_plan(b: &mut Battle, r: UnitRef, tm: &ThreatMap, limit: i32) -> Option<P
                     let du = b.duel(r, tgt.unit, k);
                     let prio = priority(b, tgt.unit, r, tm);
                     let goal = tm.goals.chars.contains(&b.unit(tgt.unit).char_id);
-                    let mut v = attack_value(b, r, &du, prio, goal);
+                    let mut v = attack_value(b, r, tm, &du, prio, goal);
                     if tl.shape == 3 {
                         let (start, len) = tl.ray_of(ti);
                         for j in 0..len {
@@ -565,11 +677,30 @@ fn best_plan(b: &mut Battle, r: UnitRef, tm: &ThreatMap, limit: i32) -> Option<P
                             let d2 = b.duel(r, e2, k);
                             let p2 = priority(b, e2, r, tm);
                             let g2 = tm.goals.chars.contains(&b.unit(e2).char_id);
-                            v += attack_value(b, r, &d2, p2, g2);
+                            v += attack_value(b, r, tm, &d2, p2, g2);
                         }
                     }
                     let extra = if v > 0.0 && second(ap_there) { 0.4 * v } else { 0.0 };
-                    offer(&mut best, Plan { node, act: Act::Attack { target: tgt.unit, skill: k }, gain: v, value: ranked(v + extra, pos) });
+                    let eu = b.unit(tgt.unit);
+                    let kill = (du.calc.fc_dmg >= eu.hp as i32 && du.calc.fc_hit >= 50).then_some(tgt.unit);
+                    offer(&mut best, Plan { node, act: Act::Attack { target: tgt.unit, skill: k }, gain: v + extra, value: ranked(v + extra, pos), cell: (x, y), kill });
+                }
+            }
+        }
+        if !items.is_empty() && ap_there >= item_cost {
+            for &id in &items {
+                let reach = b.item(id).map_or(0, |it| it.reach as i8 as i32).max(0);
+                for i in 0..b.army(r.side).units.len() {
+                    let o = UnitRef::new(r.side, i);
+                    let ou = b.unit(o);
+                    if !ou.on_map() || distance(x, y, ou.x, ou.y) > reach || !b.item_equippable(ou, id) {
+                        continue;
+                    }
+                    let v = item_value(b, id, o);
+                    if v > 0.0 {
+                        // The turn ends there: its safety counts in full.
+                        offer(&mut best, Plan { node, act: Act::Item { target: o, id }, gain: v, value: v - 0.4 * pos, cell: (x, y), kill: None });
+                    }
                 }
             }
         }
@@ -587,17 +718,44 @@ fn best_plan(b: &mut Battle, r: UnitRef, tm: &ThreatMap, limit: i32) -> Option<P
     }
     tried.extend(spell_cells.iter().filter(|c| c.1 != 0).take(SPELL_CELLS).map(|c| (c.1, c.2, c.3)));
     for (node, x, y) in tried {
-        let pos = cell_cost(b, r, tm, x, y, def_now);
+        let pos = cell_cost(b, r, tm, x, y, def_now, &[]);
         ai::set_pos(b, r, x, y);
         if let Some((plan, v)) = best_spell_here(b, r, tm, limit, &spells) {
-            offer(&mut best, Plan { node, act: Act::Spell(plan), gain: v, value: ranked(v, pos) });
+            offer(&mut best, Plan { node, act: Act::Spell(plan), gain: v, value: ranked(v, pos), cell: (x, y), kill: None });
         }
     }
     ai::set_pos(b, r, x0, y0);
     b.unit_mut(r).facing = f0;
+    let pick = reply_rank(b, r, tm, def_now, best);
     b.rng.restore(snap);
-    best
+    pick
 }
+
+/// The 2-ply look at the best few candidates: the opponents' reply where
+/// the unit ends up, without those the action likely kills; acting from
+/// beyond every reply is worth a quarter more.
+fn reply_rank(b: &mut Battle, r: UnitRef, tm: &ThreatMap, def_now: i32, mut plans: Vec<Plan>) -> Option<Plan> {
+    plans.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap_or(std::cmp::Ordering::Equal));
+    plans.truncate(REPLY_TOP);
+    let mut best: Option<(f32, Plan)> = None;
+    for p in plans {
+        let gone: Vec<UnitRef> = p.kill.into_iter().collect();
+        let (x, y) = p.cell;
+        let after = cell_cost(b, r, tm, x, y, def_now, &gone);
+        let safe = tm.at_without(x, y, &gone) == 0;
+        let w = if matches!(p.act, Act::Item { .. }) { 0.4 } else { REPLY_WEIGHT };
+        let v = p.gain * if safe { SAFE_BONUS } else { 1.0 } - w * after;
+        if best.map_or(true, |(bv, _)| v > bv) {
+            best = Some((v, p));
+        }
+    }
+    best.map(|b| b.1)
+}
+
+/// The reply's weight in `reply_rank`.
+const REPLY_WEIGHT: f32 = 0.06;
+/// Acting from beyond every reply.
+const SAFE_BONUS: f32 = 1.05;
 
 // ---------------------------------------------------------------------------
 // Movement without an action.
@@ -657,7 +815,7 @@ fn reposition_node(b: &mut Battle, r: UnitRef, tm: &ThreatMap, turn: i32) -> usi
     }
     let mut best = (f32::MAX, 0usize);
     for (node, x, y) in cands {
-        let risk = cell_cost(b, r, tm, x, y, def_now);
+        let risk = cell_cost(b, r, tm, x, y, def_now, &[]);
         let d_goal = distance(x, y, goal.0, goal.1) as f32;
         let d_ally = ally_cells.iter().map(|&(ax, ay)| distance(x, y, ax, ay)).min().unwrap_or(0) as f32;
         let score = if hurt {
@@ -674,6 +832,42 @@ fn reposition_node(b: &mut Battle, r: UnitRef, tm: &ThreatMap, turn: i32) -> usi
         }
     }
     best.1
+}
+
+// ---------------------------------------------------------------------------
+// Items.
+
+/// A consumable used the way the item screen does it (`cast::use_item_in_battle`
+/// for an aimed item, then the menu's cost): the use pose toward the target,
+/// its flash, the effect and popup (FUN_0044a619), one taken from the
+/// army's stock, the item AP (rules[0xf1]).
+fn use_item(game: &mut Game, r: UnitRef, target: UnitRef, id: u16) {
+    let (ux, uy) = (game.battle.unit(r).x, game.battle.unit(r).y);
+    let (tx, ty) = (game.battle.unit(target).x, game.battle.unit(target).y);
+    let f = super::movement::facing_toward(ux, uy, tx, ty, game.battle.unit(r).facing);
+    crate::ui::sound(game, 0x7e);
+    if actions::presenting(game) {
+        super::view::play_action(game, r, f, 1);
+        super::camera::redraw(game);
+        let act = game.battle.unit(r).act;
+        game.battle.unit_mut(r).act = 0;
+        super::view::flash_unit(game, target, 0x61, false);
+        game.battle.unit_mut(r).act = act;
+        super::view::draw_unit(game, target, 0);
+        crate::gfx::present(game);
+    }
+    super::trace!("ai item {:?} uses {id} on {:?}", r, target);
+    super::cast::apply_item(game, target, id);
+    if let Some(c) = (id as usize).checked_sub(1).and_then(|i| game.battle.army_mut(r.side).inventory.get_mut(i)) {
+        *c = c.saturating_sub(1);
+    }
+    let cost = game.battle.c(0xf1);
+    let u = game.battle.unit_mut(r);
+    u.ap -= cost as i16;
+    if u.ap < u.ap_carry {
+        u.ap_carry = u.ap;
+    }
+    u.turn_flags |= tf::ITEM;
 }
 
 // ---------------------------------------------------------------------------
@@ -732,6 +926,11 @@ pub fn fight(game: &mut Game, ctl: &mut Ctl) {
                 ai::attack(game, r, target, skill);
             }
             Act::Spell(sp) => ai::cast(game, r, sp),
+            Act::Item { target, id } => {
+                use_item(game, r, target, id);
+                turn::ai_finish(game, r);
+                return;
+            }
         }
         if !game.battle.unit(r).on_map() {
             return;
@@ -781,6 +980,40 @@ mod tests {
         // Adding a source only adds threat.
         let total: i64 = tm.dmg.iter().map(|&v| v as i64).sum();
         assert!(total > 0);
+    }
+
+    #[test]
+    fn reply_without_killed_sources() {
+        let Some(mut b) = stage1() else { return eprintln!("ai_plus tests: no game data, skipped") };
+        let me = first_enemy(&b);
+        let tm = threat_map(&mut b, me);
+        let all: Vec<UnitRef> = tm.sources.iter().map(|s| s.0).collect();
+        for y in 0..tm.rows {
+            for x in 0..tm.width {
+                assert_eq!(tm.at_without(x, y, &[]), tm.at(x, y));
+                assert_eq!(tm.at_without(x, y, &all), 0, "nobody left to reply");
+                if let Some(&one) = all.first() {
+                    assert!(tm.at_without(x, y, &[one]) <= tm.at(x, y));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn items_only_when_needed_and_in_stock() {
+        let Some(mut b) = stage1() else { return eprintln!("ai_plus tests: no game data, skipped") };
+        let me = first_enemy(&b);
+        // 藥草-like HP item: the first consumable with effect 0x21.
+        let herb = b.t().items.iter().position(|it| it.kind == 0xc && it.effect == 0x21).map(|i| i as u16 + 1).expect("an HP item");
+        assert!(usable_items(&b, me).is_empty(), "the enemy carries nothing at first");
+        b.army_mut(Side::Enemy).add_item(herb as usize, 1);
+        if b.item_equippable(b.unit(me), herb) {
+            assert_eq!(usable_items(&b, me), vec![herb]);
+        }
+        assert_eq!(item_value(&b, herb, me), 0.0, "no heal at full HP");
+        let max = b.unit(me).hp_max;
+        b.unit_mut(me).hp = (max / 4).max(1);
+        assert!(item_value(&b, herb, me) > 0.0);
     }
 
     #[test]

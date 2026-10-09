@@ -44,7 +44,9 @@
 //! // unit animation state
 //! set_anim(game, r, set)                                 FUN_00441ac4: animation set (0 idle, 1 active/walk, 2 attack ...), first frame
 //! step_unit(game, r, dir)                                FUN_00441a24: face `dir`, or advance one frame
-//! reload_sprite(game, r)                                 re-decode after a class change / summon
+//! image_shadow(game, img, x, y)                           FUN_0042049d (the facing ring's drop shadow)
+//! reload_sprite(game, r)                                 re-decode after a class change
+//! summon_sprite(game, r)                                 a summon's frame as it stands (FUN_0043eef6)
 //! // presenting helpers (block until done)
 //! animate_walk(game, r, &[(x, y, dir)])                  FUN_0044c331 presentation: 8 cs per cell, camera follows, footsteps
 //! play_action(game, r, dir, set)                         FUN_0044ebb2: play an action once, 12 cs per frame
@@ -303,8 +305,10 @@ fn sync_sprites(game: &mut Game) {
                     let f = l.facing;
                     assets.sprites.set_action(&mut l, f);
                 }
-                // FUN_0043f96a: a new unit starts the action of its facing.
-                None => {
+                // FUN_0043f96a: a new unit starts the action of its facing; a
+                // summoned creature keeps the frame it was created with
+                // (FUN_0043eef6: FUN_0043a254 + FUN_0043a34f, no FUN_0043a1fe).
+                None if !l.is_summon() => {
                     let f = l.facing;
                     assets.sprites.set_action(&mut l, f);
                 }
@@ -912,6 +916,59 @@ pub fn cell_screen(game: &mut Game, x: i32, y: i32) -> (i32, i32) {
     game.battle.view.map.as_ref().map_or((0, 0), |m| m.cell_screen(x, y))
 }
 
+/// Port of FUN_0042049d(x, y, img, page): darken the current page through
+/// the shadow table (DAT_004a0408, tint 6) under the non-zero pixels of the
+/// raw image `img` placed at (x, y) — the drop shadow of the facing ring.
+/// Its clipping is kept: a right overflow replaces the left skip, the
+/// bottom limit is row 0x1e0.
+pub fn image_shadow(game: &mut Game, img: &Image, mut x: i32, mut y: i32) {
+    let lut = game.res().tints[6];
+    let (iw, ih) = (img.width as i32, img.height as i32);
+    let (mut w, mut h) = (iw, ih);
+    let mut src = 0i32;
+    let mut skip = 0i32;
+    if y < 0 {
+        if y + h < 1 {
+            return;
+        }
+        h += y;
+        src -= y * w;
+        y = 0;
+    }
+    if x < 0 {
+        if x + w < 1 {
+            return;
+        }
+        skip = -x;
+        w += x;
+        x = 0;
+        src += skip;
+    }
+    if x + w > 0x280 {
+        skip = w - 0x280 + x;
+        w = 0x280 - x;
+    }
+    if y + h > 0x1df {
+        h = 0x1e0 - y;
+    }
+    let page = game.scr.page();
+    let stride = page.width as i32;
+    let mut dst = y * stride + x;
+    for _ in 0..h.max(0) {
+        for _ in 0..w {
+            if img.pixels.get(src as usize).is_some_and(|&p| p != 0) {
+                if let Some(p) = page.pixels.get_mut(dst as usize) {
+                    *p = lut[*p as usize];
+                }
+            }
+            src += 1;
+            dst += 1;
+        }
+        src += skip;
+        dst += stride - w;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Cursor and ranges.
 
@@ -1073,6 +1130,26 @@ pub fn reload_sprite(game: &mut Game, r: UnitRef) {
         b.set_action(l, l.facing);
         b.decode(l, g);
     });
+}
+
+/// FUN_0043eef6 (view part): a summoned unit's frame decoded as it stands
+/// (FUN_0043a254 + FUN_0043a34f, no FUN_0043a1fe): a new summon's frame
+/// byte is 0, a reused one keeps its last.
+pub fn summon_sprite(game: &mut Game, r: UnitRef) {
+    let n = game.battle.army(r.side).units.len();
+    let units = &mut game.battle.view.units[r.side.index()];
+    if units.len() < n {
+        units.resize_with(n, UnitGfx::default);
+    }
+    let Some(assets) = game.battle.view.assets.take() else { return };
+    let mut l = look_of(&game.battle, r);
+    let mut g = std::mem::take(&mut game.battle.view.units[r.side.index()][r.idx]);
+    assets.sprites.decode(&mut l, &mut g);
+    fit_under(&mut g);
+    g.synced = Some(unit::frame_key(&l));
+    store(&mut game.battle, r, &l, &g);
+    game.battle.view.units[r.side.index()][r.idx] = g;
+    game.battle.view.assets = Some(assets);
 }
 
 // ---------------------------------------------------------------------------

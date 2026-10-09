@@ -137,10 +137,14 @@ Fixed in my files from its findings:
 Status (full check.sh): stage1 55/55, title 9/9, versus 11/11, town 16/16,
 shop 16/16, church 13/13, saveload 6/6, settings 11/11, worldmap 14/14,
 after1 15/15, deploy 12/12, ending 34/34, classchange 16/16,
-classchange_hidden 11/11, cave 10/10, cave_return 34/34, ending_r0 54/54,
-ending_r1 49/49 (ending variants of flags 76 / 78, one per route); every
-written save and CFG identical. The other ending variants (73/75/77/79 after
-stages 61/131, 74/80 with flag 42/63) need runs that take those branches.
+classchange_hidden 11/11, classchange_battle 13/13, inn 17/17, cave 10/10,
+cave_return 34/34, and all eight ending variants: ending_73 43/43,
+ending_74 53/53, ending_75 43/43, ending_r0 (76) 54/54, ending_77 38/38,
+ending_r1 (78) 49/49, ending_79 38/38, ending_80 49/49; every written save
+and CFG identical. Every inn hotspot, church service and shop list now has a
+script. Open (routed): the facing picker after an in-battle command
+(FUN_0044d7c1) draws its arrows over the units in front; the original lets
+them cover the arrows (repro: dump/oracle/repro/classchange_battle_facing.s2).
 
 ## Known issues / deviations
 

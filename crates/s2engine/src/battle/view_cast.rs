@@ -17,7 +17,6 @@ use super::super::camera;
 use super::super::movement::facing_toward;
 use super::super::spells::Cast;
 use super::super::targeting::SpellTarget;
-use super::unit::ACT_COMBAT;
 
 /// The four BIN 10 presentation bytes of a spell.
 #[derive(Debug, Clone, Copy, Default)]
@@ -284,19 +283,14 @@ pub fn effect_scene(game: &mut Game, cast: &Cast, tg: &SpellTarget, kind: u8) {
     } else {
         None
     };
+    // Page 1: the window, the caster (FUN_0043ff88), then that unit erased
+    // from the page (FUN_00441e09: its save-under, the units around it
+    // redrawn); the surface keeps it.
     game.scr.set_page(1);
-    // FUN_00441e09 restores what lies behind that unit: draw the window
-    // with it lifted off the surface instead.
-    let saved = gone.map(|u| game.battle.unit(u).act);
-    if let Some(u) = gone {
-        game.battle.unit_mut(u).act = ACT_COMBAT;
-    }
     super::motion::draw_window(game);
-    if gone != Some(r) {
-        super::draw_unit(game, r, 0);
-    }
-    if let (Some(u), Some(a)) = (gone, saved) {
-        game.battle.unit_mut(u).act = a;
+    super::draw_unit(game, r, 0);
+    if let Some(u) = gone {
+        super::erase_on_page(game, u);
     }
     tint_scene(game, cast, sp, tg, sf);
     game.scr.set_page(0);

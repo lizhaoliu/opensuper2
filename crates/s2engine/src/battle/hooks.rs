@@ -1181,12 +1181,19 @@ pub struct BattleEffects {
     pub caster: Option<UnitRef>,
     /// FUN_0044b515: the quake item's user and the units it hit.
     pub quakes: Vec<(UnitRef, Vec<(UnitRef, i32)>)>,
+    /// FUN_0044b41b: the slaying item's user and its victim.
+    pub slays: Vec<(UnitRef, UnitRef)>,
 }
 
 impl super::spells::EffectHooks for BattleEffects {
     fn die(&mut self, b: &mut super::Battle, u: UnitRef, mode: i32) {
         b.unit_mut(u).flags |= flag::DEAD;
         self.died.push((u, mode));
+    }
+
+    fn slay(&mut self, b: &mut super::Battle, user: UnitRef, victim: UnitRef) {
+        b.unit_mut(victim).flags |= flag::DEAD;
+        self.slays.push((user, victim));
     }
 
     /// FUN_0043e5dd + FUN_00442022.
@@ -1230,6 +1237,9 @@ pub fn finish_effects(game: &mut Game, mut fx: BattleEffects) {
     for (user, hits) in std::mem::take(&mut fx.quakes) {
         play_quake(game, user, &hits, &mut fx);
     }
+    for (user, victim) in std::mem::take(&mut fx.slays) {
+        play_slay(game, user, victim);
+    }
     for (r, _, spells, draw_unit) in &fx.learned {
         show_learned(game, *r, spells, *draw_unit);
     }
@@ -1243,7 +1253,7 @@ pub fn finish_effects(game: &mut Game, mut fx: BattleEffects) {
         }
     }
     for r in fx.summoned {
-        view::reload_sprite(game, r);
+        view::summon_sprite(game, r);
         match fx.caster {
             Some(c) => view::motion::summon_rise(game, c, r),
             None => {
@@ -1435,6 +1445,20 @@ fn script_teleport(game: &mut Game, r: UnitRef, steps: &[(i32, i32, u8)], mode: 
     if shown(game) {
         view::fade_unit(game, r, 0xc2, true);
     }
+}
+
+/// FUN_0044b41b's presentation: the user (act 0) into the map surface, the
+/// camera to the victim when it is not well inside the view, the victim
+/// off the surface and down (FUN_0044d14b), the user off the surface again.
+fn play_slay(game: &mut Game, user: UnitRef, victim: UnitRef) {
+    game.battle.unit_mut(user).act = 0;
+    view::put_unit(game, user);
+    let (x, y) = (game.battle.unit(victim).x, game.battle.unit(victim).y);
+    camera::ensure_visible(game, x, y, None);
+    game.battle.unit_mut(victim).flags &= !flag::DEAD;
+    view::erase_unit(game, victim);
+    actions::die(game, victim, 0);
+    view::erase_unit(game, user);
 }
 
 /// FUN_0044b515 / FUN_0044b594's presentation: page 0 into 1, the shake

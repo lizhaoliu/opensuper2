@@ -771,10 +771,31 @@ fn idle_anim(game: &mut Game, r: UnitRef) -> bool {
     actions::face(game, r, f);
     if presenting(game) {
         game.scr.copy_page(0, 1);
-        view::draw_unit(game, r, 0);
+        draw_by_move_type(game, r);
     }
     game.battle.unit_mut(r).anim_timer = game.ticks();
     true
+}
+
+/// The selected unit as FUN_004351ad / FUN_004352a8 / FUN_0044d7c1 draw it,
+/// by its move type (FUN_0043aa26): 3 its ground shadow (FUN_00442811(.., 0))
+/// and the unit 4 rows up (FUN_0042665a), 4 on its mount stepping now
+/// (FUN_00457345(.., 1)), 5 on the flying sword (FUN_004573cb), otherwise
+/// FUN_0043ff88.
+fn draw_by_move_type(game: &mut Game, r: UnitRef) {
+    let mt = {
+        let u = game.battle.unit(r).clone();
+        game.battle.move_type(&u)
+    };
+    match mt {
+        3 => {
+            view::draw_ground_shadow(game, r);
+            view::motion::draw_lifted(game, r, 4);
+        }
+        4 => view::motion::draw_flyer(game, r, true),
+        5 => view::motion::draw_sword_rider(game, r),
+        _ => view::draw_unit(game, r, 0),
+    }
 }
 
 /// Port of FUN_004352a8: highlight the selected entry and show its label.
@@ -793,7 +814,7 @@ fn hover(game: &mut Game, r: UnitRef, m: &mut Menu) {
     }
     if !ticked {
         game.scr.copy_page(0, 1);
-        view::draw_unit(game, r, 0);
+        draw_by_move_type(game, r);
     }
     m.shown = m.sel;
     let e = m.entry(m.sel);
@@ -1497,6 +1518,7 @@ pub fn rest_command(game: &mut Game, r: UnitRef, mode: i32) -> bool {
         ax -= 0xc;
         ay -= 0xc;
         if let Ok(ring) = game.res().ui_image(28) {
+            view::image_shadow(game, &ring, ax - 4, ay + 4);
             gfx::blit(game.scr.page(), &ring, ax, ay, false);
         }
         gfx::blit(game.scr.page(), &bar, bx, by, true);
@@ -1520,7 +1542,7 @@ pub fn rest_command(game: &mut Game, r: UnitRef, mode: i32) -> bool {
                 moved = false;
                 if !ticked {
                     game.scr.copy_page(0, 1);
-                    view::draw_unit(game, r, 0);
+                    draw_by_move_type(game, r);
                 }
                 let f = (game.battle.unit(r).facing & 3) as usize;
                 let (slot, dx, dy) = arrows[f];
@@ -1559,14 +1581,15 @@ pub fn rest_command(game: &mut Game, r: UnitRef, mode: i32) -> bool {
                         yes = !yes;
                         let sel = if yes { 0 } else { 1 };
                         cursor::warp(game, bx + 0xb8 + sel * 0x1f, by + 0x14);
+                        dirty = true;
                     }
+                    // A new facing shows at the next idle step (FUN_004351ad).
                     0x49 => set_face(game, 2),
                     0x4f => set_face(game, 0),
                     0x51 => set_face(game, 1),
                     0x47 => set_face(game, 3),
                     _ => {}
                 }
-                dirty = true;
             } else if kind == ev::MOUSE_DOWN || kind == ev::MOUSE_MOVE {
                 let in_row = ey >= by + 4 && ey <= by + 0x20;
                 if kind == ev::MOUSE_MOVE {
@@ -1605,7 +1628,6 @@ pub fn rest_command(game: &mut Game, r: UnitRef, mode: i32) -> bool {
                         }
                     }
                     game.wait_event(ev::MOUSE_UP);
-                    dirty = true;
                 } else if mods & ev::M_RBUTTON != 0 {
                     if mode != 2 {
                         confirmed = Some(false);

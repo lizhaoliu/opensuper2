@@ -1,0 +1,57 @@
+#! saves cave
+# In-battle class change: the "cave" fixture (route 0's stage-59 turn-1 autosave) loaded, the
+# objectives closed, Tab selects 志超 (劍手 L50) and opens his command row, 轉職 (the fifth
+# icon) opens the class change screen (FUN_00453986), 劍客 is chosen and confirmed (the growth
+# rolls show on that screen), then the sprite reload, the wipe-in on the map and the facing
+# picker after it (FUN_0044d7c1: the ring's drop shadow, the unit drawn by its move type).
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+shot l1
+frames 300
+shot l2
+key RETURN
+frames 300
+shot l3
+key RETURN
+frames 300
+shot l4
+key TAB
+frames 200
+shot menu
+move 370 150
+frames 60
+shot hover
+click 370 150
+frames 300
+shot cards
+click 100 150
+frames 200
+shot confirm
+click 110 428
+frames 10
+shot w010
+frames 10
+shot w020
+frames 10
+shot w030
+frames 15
+shot w045
+frames 15
+shot w060
+frames 20
+shot w080
+frames 20
+shot w100
+frames 50
+shot w150
+frames 100
+shot w250

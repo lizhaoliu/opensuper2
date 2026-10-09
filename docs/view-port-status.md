@@ -70,3 +70,38 @@ save-under after MS; `oracle.py --peek 80494800:W*H` dumps the original's
 
 Full check.sh: 1370/1379 before the explicit-call port, 1379/1379 after
 (every script pixel- and file-identical).
+
+## Coverage scripts (2026-10-09)
+
+Fixtures: `tools/oracle/make_view_fixtures.sh` (status5, summon5, cast5, summondead5;
+the edits are documented in its header). All identical against the oracle:
+
+- `view_status5.s2` (134 shots): petrify / freeze / invisible / poison on both sides,
+  map and combat, four auto turns.
+- `view_summon5.s2` (146): 羅莎莉 casts 地元素 from the menu, the rise (FUN_004608e2),
+  four auto turns in which the summon acts and casts 地震 (kind 8).
+- `view_summondead5.s2` (30): the summon (1 HP, next to an archer) killed in the
+  enemy phase (FUN_0044d14b frees its slot).
+- `view_cast5.s2` (148): 隱身 (kind 1: the effect scene's on-page erase,
+  FUN_004663a8 / FUN_00441e09) cast from the menu, then 四象劍法 (spell 109, kind 6)
+  and other techniques in four auto turns.
+- `classchange_battle.s2` now runs through the facing picker (FUN_0044d7c1).
+
+Fixes they needed:
+- the cast confirm loop draws through the aim frame (FUN_00401d75 → FUN_00403f82:
+  range window + caster by move type on every pass);
+- summons keep their creation frame (FUN_0043eef6 has no FUN_0043a1fe:
+  `view::summon_sprite`; `sync_sprites` skips the action start for summons);
+- the facing ring's drop shadow (FUN_0042049d, `view::image_shadow`) in the rest box
+  (FUN_0044d7c1) and the ray/cone confirm (FUN_00403f82);
+- the rest box / command menu / idle step draw the unit by move type
+  (FUN_004351ad / FUN_004352a8 / FUN_0044d7c1: `menu::draw_by_move_type`), and the
+  rest box redraws only on 是/否 changes (a new facing shows at the next idle step).
+
+Not coverable: the slay item (FUN_0044b41b, item effect 0x1b) is ported exactly
+(`hooks::play_slay`), but no shipped item has usage 1 with effect 0x1b (usage-2
+items cast the spell numbered by their effect), so only a patched ITEMSP.BIN
+could reach it. The effect scene's teleport branch (kind 1 with effect 4) is
+unreachable too: 隱身 is the only kind-1 spell.
+
+Full check.sh: 41 scripts, 2135/2135 shots identical, no file diffs.

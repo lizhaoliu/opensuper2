@@ -45,6 +45,10 @@ pub trait EffectHooks {
     /// FUN_0044bfb2's windows: `unit` learned `spells` (0-based) of `school`
     /// (`draw_unit`: param_5 == 0, the unit is redrawn over the map first).
     fn learned(&mut self, _b: &mut Battle, _unit: UnitRef, _school: i32, _spells: &[usize], _draw_unit: bool) {}
+    /// FUN_0044b41b: `user`'s item slays `victim` (default: a plain death).
+    fn slay(&mut self, b: &mut Battle, _user: UnitRef, victim: UnitRef) {
+        self.die(b, victim, 0);
+    }
     /// FUN_0044b515's presentation: `user`'s quake item, then per unit hit
     /// (in FUN_0044b594's order) the HP it lost (`hp == 0` afterwards: it died).
     fn quake(&mut self, _b: &mut Battle, _user: UnitRef, _hits: &[(UnitRef, i32)]) {}

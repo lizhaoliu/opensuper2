@@ -811,6 +811,12 @@ pub fn ai_aim(game: &mut Game, t: &mut SpellTarget, x: i32, y: i32, dir: i32) {
 
 /// The panel part of FUN_00401d75: the target's forecast while aiming.
 fn aim_panel(game: &mut Game, t: &SpellTarget) {
+    aim_frame(game, t, false);
+}
+
+/// FUN_00401d75(.., 0): one aim frame; `confirming` (+0x69) with a ready
+/// target draws the 是/否 panel or the direction arrows (FUN_00403f82).
+fn aim_frame(game: &mut Game, t: &SpellTarget, confirming: bool) {
     if !presenting(game) {
         return;
     }
@@ -860,6 +866,8 @@ fn aim_panel(game: &mut Game, t: &SpellTarget) {
             }
             None => view::panel::status_bar(game, None),
         }
+    } else if t.ready == 1 && confirming {
+        draw_confirm(game, t);
     }
     cursor::draw_present(game, None, false);
 }
@@ -1030,14 +1038,13 @@ fn confirm_cell(game: &mut Game, t: &mut SpellTarget) -> i32 {
 /// The confirm loop of FUN_004041d7 (input table at 0x404fde).
 fn confirm_loop(game: &mut Game, t: &mut SpellTarget) -> i32 {
     let ray = t.aim.shape == 5 || t.aim.shape == 8;
+    // FUN_00401d75(.., 0) on every pass without input, and after a change.
     let mut dirty = true;
     loop {
         actions::pump(game);
-        if dirty {
-            draw_confirm(game, t);
+        if dirty || !game.get_event(0xffff) || !(1..=0x20).contains(&game.ev.kind) {
+            aim_frame(game, t, true);
             dirty = false;
-        }
-        if !game.get_event(0xffff) || !(1..=0x20).contains(&game.ev.kind) {
             continue;
         }
         let (kind, mods, ex, ey) = (game.ev.kind, game.ev.mods, game.ev.x, game.ev.y);
@@ -1154,11 +1161,6 @@ fn confirm_loop(game: &mut Game, t: &mut SpellTarget) -> i32 {
 /// Port of FUN_00403f82 (via FUN_00401d75): the 是/否 panel with the
 /// question, or for rays and cones the direction arrows round the caster.
 fn draw_confirm(game: &mut Game, t: &SpellTarget) {
-    if !presenting(game) {
-        return;
-    }
-    camera::redraw(game);
-    view::draw_unit(game, t.caster, 0);
     let ray = t.aim.shape == 5 || t.aim.shape == 8;
     if t.mode == 2 || !ray {
         let (px, py) = game.battle.cast_panel;
@@ -1173,6 +1175,7 @@ fn draw_confirm(game: &mut Game, t: &SpellTarget) {
         let (sx, sy) = view::cell_screen(game, ax, ay);
         let (sx, sy) = (sx - 0xc, sy - 0xc);
         if let Ok(ring) = game.res().ui_image(28) {
+            view::image_shadow(game, &ring, sx - 4, sy + 4);
             gfx::blit(game.scr.page(), &ring, sx, sy, false);
         }
         let (slot, dx, dy) = match t.dir & 3 {
@@ -1185,7 +1188,6 @@ fn draw_confirm(game: &mut Game, t: &SpellTarget) {
             gfx::blit(game.scr.page(), &a, sx + dx, sy + dy, false);
         }
     }
-    cursor::draw_present(game, None, false);
 }
 
 /// Port of FUN_004052e3 (teleport): pick the destination among the area
@@ -1336,7 +1338,7 @@ pub fn use_item_in_battle(game: &mut Game, r: UnitRef, id: u16) -> i32 {
 
 /// FUN_0044a619 through `Battle::use_item` with the battle's effect hooks
 /// and the amount popup.
-fn apply_item(game: &mut Game, r: UnitRef, id: u16) {
+pub(super) fn apply_item(game: &mut Game, r: UnitRef, id: u16) {
     let mut fx = BattleEffects::default();
     let amount = game.battle.use_item(r, id, false, &mut fx);
     finish_effects(game, fx);

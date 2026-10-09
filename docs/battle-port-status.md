@@ -171,8 +171,14 @@ Enhanced enemy AI (not the original; `battle/ai_plus.rs`):
   keep safer). No action: hurt units with a healer around step out of the threat; units alone in front wait at
   the threat's edge for the group (up to turn 8); the rest advance on the best target over the safest cells.
   The evaluation draws no RNG (snapshot / restore).
-- Evaluation `tools/ai_eval.sh` (17 stages, 5 seeds, natural turn-1 saves, player on 自動作戰): player wins 45% →
-  29%, turns 10.3 → 9.2, no unfinished battles; think time median ~9 ms, p99 ~80 ms per unit (release).
+- Evaluation `tools/ai_eval.sh` (17 stages, natural turn-1 saves, player on 自動作戰). 10 seeds: player wins
+  44% (original) → 35% (enhanced; the 29% of the first 5-seed run was luck, ±4% is noise at 170 runs), turns
+  10.8 → 10.1, no unfinished battles; think time median ~10 ms, p99 ~100 ms per unit (release).
+- Second pass: items (army consumables — no enemy record in the campaign carries any: their item lists are
+  equipment, healing items only appear as drops on stages 28 / 98), the 2-ply reply ranking (threat without
+  the likely-killed units), an objective term (lose-condition progress). All neutral against 自動作戰 (35%);
+  tried and dropped as worse: healers / casters kept back (−5..−7 points), a higher bar for spells, holding
+  every unit early, hit-and-run, converging on one focal target.
 - Tests: `ai_plus::tests` (threat map coverage / no RNG, priority, plans put the unit back).
 Next: stages 6 / 75 are TABLES'.
 

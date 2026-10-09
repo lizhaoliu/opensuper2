@@ -499,7 +499,7 @@ impl Battle {
             hooks.message(self, r, 0xe4);
             return;
         }
-        hooks.die(self, UnitRef::new(foe, v), 0);
+        hooks.slay(self, r, UnitRef::new(foe, v));
     }
 
     /// Port of FUN_0044b515 + FUN_0044b594 (item ability 0x20): every deployed

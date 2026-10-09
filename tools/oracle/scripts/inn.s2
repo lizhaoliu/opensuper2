@@ -1,0 +1,66 @@
+#! saves town
+# The inn's remaining screens (the "town" fixture): the quit prompt (declined), the equipment
+# screen used for real (the armour taken off, its stat preview, put back on), the 自動裝備
+# prompt (accepted: every member auto-equipped), then a save to slot 2 so the resulting
+# equipment is compared byte for byte.
+frames 300
+key ESCAPE
+frames 300
+key ESCAPE
+frames 400
+key DOWN
+frames 30
+key RETURN
+frames 200
+key RETURN
+frames 300
+click 298 253
+frames 400
+shot inn
+move 84 230
+frames 60
+shot quit_hover
+click 84 230
+frames 200
+shot quit_prompt
+rclick 320 240
+frames 200
+shot quit_no
+click 352 361
+frames 300
+shot equip
+click 145 271
+frames 200
+shot e_weapon
+click 145 309
+frames 200
+shot e_armor
+click 365 268
+frames 200
+shot e_unequip
+click 365 305
+frames 200
+shot e_reequip
+rclick 320 240
+frames 300
+shot equip_back
+move 190 400
+frames 60
+shot auto_hover
+click 190 400
+frames 200
+shot auto_prompt
+key RETURN
+frames 300
+shot auto_done
+click 352 361
+frames 300
+shot equip_after_auto
+rclick 320 240
+frames 300
+click 492 239
+frames 300
+shot save_menu
+click 320 95
+frames 300
+shot saved
