@@ -1069,11 +1069,14 @@ impl Battle {
     /// Port of FUN_004063c4: other support and status spells. Enemy-target
     /// spells add each enemy's value (FUN_0046be07); spells on own units
     /// subtract theirs, so the AI never picks them — the original's sign.
+    /// Not the original: with `ai_varied` the enemy army's own units add
+    /// their value instead, so it does cast buffs on its own side.
     /// The value of a unit the filter rejects is the previous one (the
     /// original's uninitialised local, 0 here at first).
     fn score_support(&mut self, t: &mut SpellTarget, cast: &Cast, cell: &mut (i32, i32), best_s: &mut i32) -> i32 {
         let tk = t.aim.target;
         let foe = t.side.other();
+        let buff_own = self.ai_varied && self.army(t.side).side == Side::Enemy;
         let mut state = 0;
         let mut value = 0;
         for k in 0..t.range.len() {
@@ -1099,7 +1102,14 @@ impl Battle {
                             if kind > 0 {
                                 value = v;
                             }
-                            s = s.wrapping_sub(value);
+                            if buff_own {
+                                if first == 0 && kind > 0 {
+                                    first = kind;
+                                }
+                                s = s.wrapping_add(if kind > 0 { v } else { 0 });
+                            } else {
+                                s = s.wrapping_sub(value);
+                            }
                         }
                     }
                 }

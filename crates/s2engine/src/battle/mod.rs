@@ -126,6 +126,10 @@ pub struct Battle {
     pub cursor: (i32, i32),
     /// Mirror of `campaign.difficulty` (`DAT_00494684`), synced by the API functions.
     pub difficulty: u8,
+    /// Not the original: `ai=enhanced` is on and this is not a two-player
+    /// battle — the enemy army varies its picks and buffs its own side
+    /// (`ai::fight`, `targeting::score_support`). Synced by [`sync`].
+    pub ai_varied: bool,
     /// Mirror of `campaign.vs_mode` (`DAT_00494668`).
     pub vs: bool,
     /// Mirror of `campaign.turn` (`DAT_00494674`).
@@ -181,6 +185,7 @@ impl Default for Battle {
             // DAT_0048eaa0 / DAT_0048eaa4 start at -1 (.data).
             cursor: (-1, -1),
             difficulty: 3,
+            ai_varied: false,
             vs: false,
             turn: 1,
             route: 0,
@@ -253,6 +258,7 @@ pub fn sync(game: &mut crate::game::Game) {
     // DAT_00494510 / DAT_00494511 are story flags 9 and 10 (0x494508 + k − 1).
     b.seal_magic = c.flags[9] != 0;
     b.seal_tech = c.flags[10] != 0;
+    b.ai_varied = game.options.ai == crate::game::AiMode::Enhanced && !c.vs_mode;
 }
 
 impl std::fmt::Debug for Battle {

@@ -15,9 +15,19 @@ AI (`ai.rs`, `targeting.rs`), the player command menu with the original key tabl
 menu, cave discovery and two-player battles (`vs.rs`). Save fidelity: sprite / portrait slots
 (`slots.rs`) make every save the oracle writes byte-identical.
 
-Optional, not part of the original: the enhanced enemy AI (`ai_plus.rs`, off by default;
-`opensuper2.ini` `ai=enhanced`, s2auto `--enemy-ai enhanced`); off, the AI is the original's
-exactly.
+Optional, not part of the original (`Game::options`, opensuper2.ini, s2auto flags):
+- `ai=enhanced` (`--enemy-ai enhanced`): the original AI's decisions (`ai::fight`) with a
+  varied pick (`ai::vary_pick`): same-class spell/technique/attack plans within 80 % of the
+  original's best, weighted (score/best)², support buffs as a low-weight stand-in when AP is
+  left to attack; spells always weighed from every casting cell; the enemy army buffs its own
+  side (`targeting::score_support`, `Battle::ai_varied`). VIP-kill plans are never replaced.
+- `ai=tactical` (`--enemy-ai tactical`): the threat-map AI of `ai_plus.rs` (formerly `enhanced`).
+- `enemy_boost=N` (`--enemy-boost N`): N % added to the original's per-stage enemy army bonus
+  (`turn::adapt_difficulty`), applied once per stage (not again on reloads), never in VS.
+- Eval (`tools/ai_eval.sh` + `tools/ai_variety.py`, 17 stages × 5 seeds, player on 自動作戰):
+  player wins original 44 %, enhanced+0 60 %, enhanced+20 17 %, enhanced+40 3 %; enemy casts
+  use 27 distinct spells vs 17 and 1.6 vs 1.2 distinct spells per casting unit.
+- Off (`ai=original`, boost 0) everything is the original: check.sh 2135/2135.
 
 **Open.**
 - Sweep residues in battle code (docs/qa-status.md): `camera::scroll_exact`'s unit drawing for

@@ -21,16 +21,18 @@ pub struct FrontConfig {
     /// frame-exact with the original under page flipping; the original's
     /// fades are untimed, so on many machines they were quicker).
     pub fade_speed: u32,
-    /// `ai=enhanced`: the optional smarter enemy AI (not part of the
-    /// original; off keeps the original AI exactly).
-    pub enhanced_ai: bool,
+    /// `ai=original|enhanced|tactical`: which AI the enemy plays with
+    /// (only `original` is the original's).
+    pub ai: s2engine::game::AiMode,
+    /// `enemy_boost=0..100`: extra % on enemy stats (not the original).
+    pub enemy_boost: u8,
     path: PathBuf,
 }
 
 impl FrontConfig {
     pub fn load(game_dir: &Path) -> FrontConfig {
         let path = game_dir.join("opensuper2.ini");
-        let mut c = FrontConfig { fullscreen: false, window: None, scaling: Scaling::Fit, fade_speed: 1, enhanced_ai: false, path };
+        let mut c = FrontConfig { fullscreen: false, window: None, scaling: Scaling::Fit, fade_speed: 1, ai: Default::default(), enemy_boost: 0, path };
         let Ok(text) = std::fs::read_to_string(&c.path) else { return c };
         for line in text.lines() {
             let Some((k, v)) = line.split_once('=') else { continue };
@@ -45,7 +47,8 @@ impl FrontConfig {
                 }
                 "scaling" => c.scaling = if v == "integer" { Scaling::Integer } else { Scaling::Fit },
                 "fade_speed" => c.fade_speed = v.parse::<u32>().unwrap_or(1).clamp(1, 16),
-                "ai" => c.enhanced_ai = v.eq_ignore_ascii_case("enhanced"),
+                "ai" => c.ai = s2engine::game::AiMode::parse(v).unwrap_or_default(),
+                "enemy_boost" => c.enemy_boost = v.parse::<u8>().unwrap_or(0).min(100),
                 _ => {}
             }
         }
@@ -57,7 +60,7 @@ impl FrontConfig {
             Scaling::Fit => "fit",
             Scaling::Integer => "integer",
         }, self.fade_speed);
-        s += if self.enhanced_ai { "ai=enhanced\n" } else { "ai=original\n" };
+        s += &format!("ai={}\nenemy_boost={}\n", self.ai.name(), self.enemy_boost);
         if let Some((w, h)) = self.window {
             s += &format!("window={w},{h}\n");
         }

@@ -11,7 +11,7 @@
 //!          [--passive] [--god] [--exit-cheat] [--recover N] [--reseed]
 //!          [--roundtrip K,K,..] [--no-cd] [--caves] [--weak-enemies] [--boss-rush]
 //!          [--set-flag STAGE:FLAG[=VALUE]].. [--choice STAGE:OPTION]..
-//!          [--enemy-ai original|enhanced] [--run NAME]
+//!          [--enemy-ai original|enhanced|tactical] [--enemy-boost N] [--run NAME]
 //!   s2auto --game DIR --out DIR --oracle-check SAVE|DIR [--oracle-mode battle|town|vs:K]
 //!          [--frames N] [--shot-every N] [--record-only] [--run NAME]
 //!
@@ -87,8 +87,10 @@ struct Args {
     passive: bool,
     difficulty: u8,
     god: bool,
-    /// `--enemy-ai enhanced`: the enemy plays with `battle::ai_plus` (not the original).
-    enhanced_ai: bool,
+    /// `--enemy-ai`: which AI the enemy plays with (not the original unless `original`).
+    enemy_ai: s2engine::game::AiMode,
+    /// `--enemy-boost N`: N % stronger enemies (not the original).
+    enemy_boost: u8,
     exit_cheat: bool,
     recover: usize,
     reseed: bool,
@@ -126,7 +128,8 @@ fn parse_args() -> Result<Args> {
         passive: false,
         difficulty: 0,
         god: false,
-        enhanced_ai: false,
+        enemy_ai: s2engine::game::AiMode::Original,
+        enemy_boost: 0,
         exit_cheat: false,
         recover: 0,
         reseed: false,
@@ -172,11 +175,14 @@ fn parse_args() -> Result<Args> {
             "--passive" => a.passive = true,
             "--god" => a.god = true,
             "--enemy-ai" => {
-                a.enhanced_ai = match it.next().as_deref() {
-                    Some("enhanced") => true,
-                    Some("original") => false,
-                    other => anyhow::bail!("--enemy-ai: original or enhanced, not {other:?}"),
-                }
+                let v = it.next();
+                a.enemy_ai = v
+                    .as_deref()
+                    .and_then(s2engine::game::AiMode::parse)
+                    .with_context(|| format!("--enemy-ai: original, enhanced or tactical, not {v:?}"))?;
+            }
+            "--enemy-boost" => {
+                a.enemy_boost = it.next().and_then(|v| v.parse().ok()).context("--enemy-boost N (0..=100)")?;
             }
             "--exit-cheat" => a.exit_cheat = true,
             "--recover" => a.recover = val("--recover")?.parse()?,
@@ -258,10 +264,10 @@ fn worker(a: &Args) -> Result<()> {
     });
     let mut driver = Driver::new(a.out.clone(), a.hang_minutes);
     let hook = Box::new(move |info: &s2engine::sys::FlipInfo, sh: &Shared| driver.on_frame(info, sh));
-    let enhanced_ai = a.enhanced_ai;
+    let options = s2engine::game::Options { ai: a.enemy_ai, enemy_boost: a.enemy_boost.min(100) };
     let handle = spawn_headless(Shared::new(), hook, move |sys| {
         let mut game = s2engine::game::Game::new(sys, &data);
-        game.options.enhanced_ai = enhanced_ai;
+        game.options = options;
         qa::run(&mut game, &opts).map(|_| ())
     });
     match handle.join() {
@@ -850,8 +856,11 @@ fn worker_cmd(a: &Args, route: u8, game: &Path, out: &Path) -> Result<Command> {
             cmd.arg(flag);
         }
     }
-    if a.enhanced_ai {
-        cmd.arg("--enemy-ai").arg("enhanced");
+    if a.enemy_ai != s2engine::game::AiMode::Original {
+        cmd.arg("--enemy-ai").arg(a.enemy_ai.name());
+    }
+    if a.enemy_boost > 0 {
+        cmd.arg("--enemy-boost").arg(a.enemy_boost.to_string());
     }
     for (st, f, v) in &a.set_flags {
         cmd.arg("--set-flag").arg(format!("{st}:{f}={v}"));

@@ -912,21 +912,37 @@ fn bond_survivors(game: &mut Game, r: UnitRef) {
 /// `k = (average player power − base) / step` (clamped to ±4) gives an enemy
 /// stat bonus of `25·k` % (or `−10·k` % for k < 0, as the original computes
 /// it) plus 5 % per difficulty level above 3.
+///
+/// Not the original: `Options::enemy_boost` adds its % to that bonus (and
+/// applies on its own where the original adds none); never in two-player
+/// battles. With the boost at 0 this is exactly the original.
 pub fn adapt_difficulty(game: &mut Game) {
+    let boost = if game.campaign.vs_mode { 0 } else { game.options.enemy_boost as i32 };
+    // The enemy army is cleared at every stage start (FUN_0043deeb), so a
+    // non-zero bonus here means a mid-stage save was loaded: it already
+    // holds the boost, which must not be applied twice.
+    let fresh = game.battle.army(Side::Enemy).stat_bonus_pct == 0;
     let Some(st) = game.stage.as_ref() else { return };
     let (base, step) = (st.stage.header.scale_base as i32, st.stage.header.scale_step as i32);
-    if base == 0 || step == 0 {
-        return;
+    let mut pct = 0;
+    if base != 0 && step != 0 {
+        super::sync(game);
+        let avg = army_power(&game.battle, Side::Player);
+        let k = ((avg - base) / step).clamp(-4, 4);
+        if k != 0 {
+            pct = if k < 1 { k * -10 } else { k * 0x19 } + (game.battle.difficulty as i32 - 3) * 5;
+        }
     }
-    super::sync(game);
-    let avg = army_power(&game.battle, Side::Player);
-    let k = ((avg - base) / step).clamp(-4, 4);
-    if k == 0 {
-        return;
-    }
-    let pct = if k < 1 { k * -10 } else { k * 0x19 } + (game.battle.difficulty as i32 - 3) * 5;
-    if pct != 0 {
+    if boost == 0 || fresh {
+        pct += boost;
+        if pct != 0 {
+            scale_army(&mut game.battle, Side::Enemy, pct);
+        }
+    } else if pct != 0 {
+        // The original re-applies its own bonus on every load; keep that, and
+        // keep the boost in the army's bonus for later reinforcements.
         scale_army(&mut game.battle, Side::Enemy, pct);
+        game.battle.army_mut(Side::Enemy).stat_bonus_pct = pct + boost;
     }
 }
 

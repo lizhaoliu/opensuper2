@@ -17,15 +17,15 @@ cites the `FUN_xxxxxxxx` it reproduces; see `docs/coverage.md`): opening
 movies, title, campaign story and events, battles with the original rules,
 RNG and AI, magic, items, class changes, world map, towns, shops, church,
 deployment, save/load (original `SAVE\UJnn.SAV` format), settings,
-two-player battles and the ending; an optional enhanced enemy AI is off by
-default.
+two-player battles and the ending; optional enemy AI variants and an enemy
+stat boost are off by default.
 
 Verification: the original program runs headlessly as an oracle
 (`docs/oracle.md`) and is compared with the port pixel by pixel and save by
 save. The regression gate `tools/oracle/check.sh` (41 scripts, 2135 shots) is
 all identical; a sweep over every stage, story branch, cave, town visit and
 two-player battlefield (`tools/oracle/sweep.sh`, 148 checks) has identical
-RNG draws and saves everywhere and 140 checks identical shot for shot. The
+RNG draws and saves everywhere and 146 checks identical shot for shot. The
 few remaining frame differences and the per-area state are listed at the top
 of `docs/battle-port-status.md`, `docs/flow-port-status.md`,
 `docs/view-port-status.md` and `docs/qa-status.md`.
@@ -41,9 +41,13 @@ Windows; elsewhere pass `--soundfont FILE.sf2`.
   `scaling=fit|integer`, `window=W,H`, `fade_speed=1..16` (palette fades
   N times faster; 1 matches the original under 60 Hz page flipping — the
   original's fades are untimed, so many machines ran them faster),
-  `ai=original|enhanced` (optional smarter enemy AI, not part of the
-  original: focus fire, objective targets, threat-aware positioning; off
-  keeps the original AI exactly).
+  `ai=original|enhanced|tactical` and `enemy_boost=0..100` (not part of the
+  original; `original` with boost 0 is exactly the original): `enhanced`
+  keeps the original AI's decisions but varies the enemy's spell /
+  technique / attack picks among near-best options and lets it buff its own
+  side; `tactical` is a threat-map AI (focus fire, objective targets,
+  positioning); `enemy_boost` adds N % to enemy HP/MP/ST and attack /
+  defence / 劍術 / 戰技 on top of the original's per-stage bonus.
 - Problems are written to `opensuper2.log` next to the game files.
 
 ## Layout

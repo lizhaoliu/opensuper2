@@ -371,9 +371,9 @@ fn run() -> Result<()> {
         }));
     }
     let fade_pace_ms = cfg.fade_pace_ms();
-    let options = s2engine::game::Options { enhanced_ai: cfg.enhanced_ai };
-    if options.enhanced_ai {
-        log!("enhanced enemy AI enabled (ai=enhanced in opensuper2.ini)");
+    let options = s2engine::game::Options { ai: cfg.ai, enemy_boost: cfg.enemy_boost };
+    if options != s2engine::game::Options::default() {
+        log!("not the original: enemy ai={} enemy_boost={}% (opensuper2.ini)", options.ai.name(), options.enemy_boost);
     }
     let game = spawn_game(shared.clone(), audio, move |sys| {
         sys.fade_pace_ms = fade_pace_ms;

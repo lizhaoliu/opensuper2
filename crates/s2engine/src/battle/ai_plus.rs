@@ -1,4 +1,4 @@
-//! The enhanced enemy AI (not the original; `Game::options.enhanced_ai`,
+//! The tactical enemy AI (not the original; `ai=tactical`, `Game::options.ai`,
 //! opensuper2.ini `ai=enhanced`). The original AI (`ai.rs`) plays every
 //! unit unless the option is on; then it still decides everything outside
 //! combat (the modes, their wake-up rules and the story moves) and hands the
@@ -56,7 +56,7 @@ const SPELL_CELLS: usize = 16;
 /// unit, not VS, not berserk.
 pub fn applies(game: &Game, r: UnitRef) -> bool {
     let b = &game.battle;
-    game.options.enhanced_ai && !b.vs && b.army(r.side).side == Side::Enemy && b.unit(r).buffs & buff::BERSERK == 0
+    game.options.ai == crate::game::AiMode::Tactical && !b.vs && b.army(r.side).side == Side::Enemy && b.unit(r).buffs & buff::BERSERK == 0
 }
 
 // ---------------------------------------------------------------------------

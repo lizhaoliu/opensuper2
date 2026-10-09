@@ -177,13 +177,50 @@ impl Default for UiState {
     }
 }
 
+/// Which AI the enemy army plays with (`ai=` in opensuper2.ini).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AiMode {
+    /// The original AI, frame-identical with the original program.
+    #[default]
+    Original,
+    /// `ai=enhanced` (not the original): the original AI's decisions, with
+    /// varied spell / technique / attack picks among near-best candidates,
+    /// spells always weighed from every casting cell, and buffs on its own
+    /// side (`ai::fight`, `targeting::score_support`).
+    Enhanced,
+    /// `ai=tactical` (not the original): the threat-map tactical AI of
+    /// `battle::ai_plus`.
+    Tactical,
+}
+
+impl AiMode {
+    pub fn parse(s: &str) -> Option<AiMode> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "original" => Some(AiMode::Original),
+            "enhanced" => Some(AiMode::Enhanced),
+            "tactical" => Some(AiMode::Tactical),
+            _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            AiMode::Original => "original",
+            AiMode::Enhanced => "enhanced",
+            AiMode::Tactical => "tactical",
+        }
+    }
+}
+
 /// Runtime options outside the original (set by the frontend, e.g. from
 /// opensuper2.ini; never saved).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Options {
-    /// `ai=enhanced`: enemy units fight with `battle::ai_plus` instead of
-    /// the original AI (at every difficulty). Off: the original.
-    pub enhanced_ai: bool,
+    pub ai: AiMode,
+    /// `enemy_boost=N` (not the original): N % more enemy HP/MP/ST and
+    /// attack/defence/剣術/戰技, added to the original's per-stage army bonus
+    /// (`turn::adapt_difficulty`); never in two-player battles. 0 = off.
+    pub enemy_boost: u8,
 }
 
 pub struct Game<'a> {

@@ -386,6 +386,56 @@ impl Battle {
         found
     }
 
+    /// Not the original (`ai=enhanced`): like [`Battle::consider_spells`] but
+    /// each spell is scored on its own (a fresh comparison per spell), giving
+    /// every spell's best plan from the unit's current cell.
+    pub fn spell_candidates(&mut self, r: UnitRef, technique: bool, limit: i32) -> Vec<(Best, SpellPlan)> {
+        let mut out = Vec::new();
+        let mut cost = self.c(0xef);
+        if self.unit(r).turn_flags & 0xc != 0 {
+            cost += self.c(0xf3);
+        }
+        if (self.unit(r).ap as i32) < cost {
+            return out;
+        }
+        if !technique && self.unit(r).status & status::SEALED != 0 {
+            return out;
+        }
+        let saved = (self.map().scroll_x, self.map().scroll_y);
+        let t = self.t();
+        for (school, idxs) in &self.spell_lists(r, technique) {
+            let first = t.spells.school_spells[school - 1].0 as u16;
+            for &i in idxs {
+                let spell = first + i;
+                if !self.spell_listed(r, spell, false, false) {
+                    continue;
+                }
+                let mut cast = Cast::new(r.side, r, spell, (0, 0));
+                cast.technique = technique;
+                let aim = self.spell_aim(spell as i32);
+                if aim.combo & 7 != 0 {
+                    cast.partner = self.combo_partner(r, spell);
+                }
+                if self.spell_shortage(self.unit(r), spell) != Shortage::Ok {
+                    continue;
+                }
+                if aim.combo & 7 != 0 && !cast.partner.is_some_and(|p| self.spell_shortage(self.unit(p), spell) == Shortage::Ok) {
+                    continue;
+                }
+                let mut tg = self.spell_target(r.side, r, spell as i32, technique as u8, 0, false);
+                self.target_range(&mut tg, aim.range);
+                let (mut best, mut plan) = (Best::new(limit), SpellPlan::default());
+                if self.ai_score_spell(&mut tg, &cast, &mut best, &mut plan) {
+                    plan.spell = spell;
+                    out.push((best, plan));
+                }
+            }
+        }
+        let m = self.map_mut();
+        (m.scroll_x, m.scroll_y) = saved;
+        out
+    }
+
     /// Port of FUN_0040b740: the best target of attack `skill` from the
     /// unit's current cell. Each target: forecast (with its random counter
     /// pick), `expected` ×VIP, ×kill when the hit likely kills, minus the
@@ -843,6 +893,8 @@ fn fight(game: &mut Game, ctl: &mut Ctl) {
     loop {
         let u = game.battle.unit(r).clone();
         let berserk = u.buffs & buff::BERSERK != 0;
+        // Not the original: `ai=enhanced` varies the enemy army's picks (see `vary_pick`).
+        let varied = game.battle.ai_varied && game.battle.army(r.side).side == Side::Enemy && !berserk;
         let mut atk_cost = game.battle.c(0xee);
         if u.abilities & 0x2000_0000 != 0 {
             atk_cost -= 4;
@@ -873,6 +925,8 @@ fn fight(game: &mut Game, ctl: &mut Ctl) {
                 4 => 0x50,
                 _ => 100,
             };
+            // Not the original: `ai=enhanced` always weighs the other casting cells.
+            let p = if varied { 100 } else { p };
             if b.rng.pct() <= p {
                 for &(i, n) in &nodes {
                     if n.can_stop != 0 && n.mark > 1 {
@@ -929,6 +983,11 @@ fn fight(game: &mut Game, ctl: &mut Ctl) {
             set_pos(b, r, x0, y0);
             b.unit_mut(r).facing = f0;
         }
+        if varied && best.kind > 1 {
+            let w = Cand { best, plan, move_to, target };
+            let c = vary_pick(&mut game.battle, ctl, &nodes, atk_cost, w);
+            (best, plan, move_to, target) = (c.best, c.plan, c.move_to, c.target);
+        }
         let u = game.battle.unit(r).clone();
         let low = |v: i16, max: i16| max > 0 && v < max && (v as i32 * 100) / (max as i32) < 0x14;
         let low_res = low(u.mp, u.mp_max) || low(u.st, u.st_max);
@@ -968,6 +1027,119 @@ fn fight(game: &mut Game, ctl: &mut Ctl) {
         show_range(game, r);
         actions::set_anim(game, r, 1);
     }
+}
+
+/// One candidate action of `ai=enhanced`'s varied pick: its comparison
+/// triple, the spell plan (spell 0 = an attack), the stop cell to walk to
+/// first (index + 1, 0 = stay) and the attack target with its skill.
+#[derive(Debug, Clone, Copy)]
+struct Cand {
+    best: Best,
+    plan: SpellPlan,
+    move_to: usize,
+    target: Option<(UnitRef, usize)>,
+}
+
+/// Not the original (`ai=enhanced`): instead of always taking the single
+/// best plan `w` the original found, weigh every spell, technique and
+/// attack from every cell on its own and pick at random among those of
+/// `w`'s class scoring at least 80 % of it, weighted by (score / best)²
+/// (damage plans may not kill fewer units); a support spell worth casting by
+/// the original's own bar may stand in for a damage plan that kills nothing,
+/// at a quarter weight and only with AP left to attack afterwards. A plan
+/// that kills a VIP (`w.best.kind == 1`) is never replaced. Movement,
+/// targets of the modes and all other decisions stay the original's.
+fn vary_pick(b: &mut Battle, ctl: &Ctl, nodes: &[(usize, Node)], atk_cost: i32, w: Cand) -> Cand {
+    let r = ctl.unit;
+    let (x0, y0, f0) = { let u = b.unit(r); (u.x, u.y, u.facing) };
+    let mut cands = vec![w];
+    // Spells and techniques, from here and from every casting cell.
+    let cells: Vec<(usize, i32, i32)> = std::iter::once((0, x0, y0))
+        .chain(nodes.iter().filter(|(_, n)| n.can_stop != 0 && n.mark > 1).map(|&(i, n)| (i + 1, n.x as i32, n.y as i32)))
+        .collect();
+    for &(m, x, y) in &cells {
+        set_pos(b, r, x, y);
+        for technique in [false, true] {
+            if b.knows_skill_kind(r, if technique { 2 } else { 1 }) {
+                for (best, plan) in b.spell_candidates(r, technique, ctl.limit) {
+                    cands.push(Cand { best, plan, move_to: m, target: None });
+                }
+            }
+        }
+    }
+    // Attacks with every usable skill, from here and (before moving) from every attack cell.
+    let kind = b.unit(r).kind as u16;
+    let actions = b.t().kinds.class(kind).map_or(0..0, |c| c.actions.clone());
+    for k in actions {
+        set_pos(b, r, x0, y0);
+        let ak = b.action_kind(k);
+        if ak == 0xb || ak == 0xc || !b.skill_usable(b.unit(r), k) || (b.unit(r).ap as i32) < atk_cost {
+            continue;
+        }
+        let moved = b.unit(r).turn_flags & tf::MOVED != 0;
+        let mut spots = vec![(0, x0, y0)];
+        if !moved {
+            spots.extend(nodes.iter().filter(|(_, n)| n.can_stop != 0 && n.mark != 0).map(|&(i, n)| (i + 1, n.x as i32, n.y as i32)));
+        }
+        for (m, x, y) in spots {
+            set_pos(b, r, x, y);
+            let mut best = Best::new(ctl.limit);
+            if let Some(e) = b.best_attack_target(r, k, &mut best) {
+                cands.push(Cand { best, plan: SpellPlan::default(), move_to: m, target: Some((e, k)) });
+            }
+        }
+    }
+    set_pos(b, r, x0, y0);
+    b.unit_mut(r).facing = f0;
+    // The original's own filters (FUN_0040aadc), then w's class: same-class
+    // plans within 80 % of w (damage plans may not kill fewer units); a
+    // support spell may stand in for a damage plan that kills nothing, but
+    // only when enough AP is left to attack after it, and at a low weight —
+    // buffing must not cost the enemy its attack.
+    let (wk, ws, wn) = (w.best.kind, w.best.score.max(1), w.best.kills);
+    let spare_ap = b.unit(r).ap as i32 >= b.c(0xef) + atk_cost;
+    let class = |c: &Cand| -> Option<bool> {
+        let (k, s, n) = (c.best.kind, c.best.score, c.best.kills);
+        if k <= 0 || s <= 0 || (k > 0x1d && ctl.situation != 1) {
+            return None;
+        }
+        let close = s as i64 * 10 >= ws as i64 * 8;
+        match wk {
+            2 if k == 2 && n >= wn && close => Some(false),
+            2 if wn == 0 && k > 3 && s >= ctl.limit && spare_ap => Some(true),
+            3 if k == 3 && close => Some(false),
+            wk if wk > 3 && k > 3 && close => Some(false),
+            _ => None,
+        }
+    };
+    let mut pool: Vec<(Cand, bool)> = Vec::new();
+    for c in cands {
+        let Some(support) = class(&c) else { continue };
+        let key = (c.plan.spell, c.plan.cell, c.plan.dir, c.move_to, c.target);
+        if !pool.iter().any(|(p, _)| (p.plan.spell, p.plan.cell, p.plan.dir, p.move_to, p.target) == key) {
+            pool.push((c, support));
+        }
+    }
+    if pool.len() < 2 {
+        return w;
+    }
+    pool.sort_by_key(|(c, _)| std::cmp::Reverse(c.best.score));
+    pool.truncate(12);
+    let top = pool.iter().filter(|(_, sup)| !sup).map(|(c, _)| c.best.score).max().unwrap_or(ws).max(1) as i64;
+    // Same-class plans weigh (score / best)², support stand-ins a quarter.
+    let weights: Vec<i32> = pool
+        .iter()
+        .map(|(c, sup)| if *sup { 250 } else { ((c.best.score as i64 * 1000 / top).pow(2) / 1000).clamp(1, 1000) as i32 })
+        .collect();
+    let pool: Vec<Cand> = pool.into_iter().map(|(c, _)| c).collect();
+    let mut roll = b.rng.rnd(weights.iter().sum());
+    for (c, wgt) in pool.iter().zip(&weights) {
+        if roll < *wgt {
+            return *c;
+        }
+        roll -= wgt;
+    }
+    w
 }
 
 /// LAB_0040b574 of FUN_0040aadc: nothing worth doing — move by the rules.
