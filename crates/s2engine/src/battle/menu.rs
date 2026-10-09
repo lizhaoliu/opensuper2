@@ -1195,6 +1195,8 @@ pub fn attack_command(game: &mut Game, r: UnitRef, skill: usize) -> bool {
             if presenting(game) {
                 game.scr.copy_page(0, 1);
                 view::draw_unit(game, r, 0);
+                // FUN_0044179b: the tall cursor on the target's cell, then the forecast.
+                view::draw_target_marker(game, t.x, t.y);
                 view::panel::attack_forecast(game, &duel);
                 cursor::draw_present(game, None, false);
             }

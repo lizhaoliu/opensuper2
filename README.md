@@ -22,7 +22,7 @@ stat boost are off by default.
 
 Verification: the original program runs headlessly as an oracle
 (`docs/oracle.md`) and is compared with the port pixel by pixel and save by
-save. The regression gate `tools/oracle/check.sh` (41 scripts, 2135 shots) is
+save. The regression gate `tools/oracle/check.sh` (42 scripts, 2245 shots) is
 all identical; a sweep over every stage, story branch, cave, town visit and
 two-player battlefield (`tools/oracle/sweep.sh`, 148 checks) has identical
 RNG draws and saves everywhere and 146 checks identical shot for shot. The
