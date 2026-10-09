@@ -745,7 +745,7 @@ fn reply_rank(b: &mut Battle, r: UnitRef, tm: &ThreatMap, def_now: i32, mut plan
         let safe = tm.at_without(x, y, &gone) == 0;
         let w = if matches!(p.act, Act::Item { .. }) { 0.4 } else { REPLY_WEIGHT };
         let v = p.gain * if safe { SAFE_BONUS } else { 1.0 } - w * after;
-        if best.map_or(true, |(bv, _)| v > bv) {
+        if best.is_none_or(|(bv, _)| v > bv) {
             best = Some((v, p));
         }
     }
@@ -802,7 +802,7 @@ fn reposition_node(b: &mut Battle, r: UnitRef, tm: &ThreatMap, turn: i32) -> usi
     let goal = targets
         .iter()
         .map(|&(e, x, y)| (priority(b, e, r, tm) / (1.0 + distance(u.x, u.y, x, y) as f32 * 0.15), x, y))
-        .fold(None::<(f32, i32, i32)>, |a, c| if a.map_or(true, |a| c.0 > a.0) { Some(c) } else { a })
+        .fold(None::<(f32, i32, i32)>, |a, c| if a.is_none_or(|a| c.0 > a.0) { Some(c) } else { a })
         .map(|c| (c.1, c.2))
         .unwrap_or((targets[0].1, targets[0].2));
     let ally_cells: Vec<(i32, i32)> =

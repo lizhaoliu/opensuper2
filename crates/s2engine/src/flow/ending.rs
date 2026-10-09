@@ -140,12 +140,12 @@ fn epilogue(game: &mut Game, bg: &Image, end: &Endings, rank: usize, r: UnitRef,
             continue;
         }
         count += 1;
-        let x = if count % 2 == 0 { 0x140 } else { 0x22 };
+        let x = if count.is_multiple_of(2) { 0x140 } else { 0x22 };
         let on = s2data::text::cstr(&game.battle.unit(o).name).to_vec();
         text::large(game, x, y, &on, 0xaf, 0, 1, 2);
         let a = format!(":{}", u.affinity[oc as usize] as i8);
         text::large(game, x + 0x78, y, a.as_bytes(), 0xaf, 0, 1, 2);
-        if count % 2 == 0 {
+        if count.is_multiple_of(2) {
             y += 0x1a;
         }
         if 0xf < count {
@@ -192,7 +192,7 @@ fn results(game: &mut Game, bg: &Image, end: &Endings, kills: u32) {
     let head = game.msg(0x102);
     text::block(game, 0x46, 0x32, &head, 0xaf, 0, 1, 2, 0x32, 0x14, 0x1c);
     let c = &game.campaign;
-    let values = [c.battles_fought as i32, c.difficulty as i32, c.fame as i32, c.rating as i32, game.battle.army(Side::Player)._d6 as i32, kills as i32];
+    let values = [c.battles_fought as i32, c.difficulty as i32, c.fame, c.rating, game.battle.army(Side::Player)._d6, kills as i32];
     for (k, v) in values.into_iter().enumerate() {
         let y = [0x32, 0x4e, 0x6a, 0x82, 0x9e, 0xba][k];
         super::town::large_number(game, 400, y, v, 0xaf, 0, 1, 2, 0);

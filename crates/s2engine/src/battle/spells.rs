@@ -747,8 +747,8 @@ impl Battle {
                 ok |= u.apply_status(turns, status::REGEN);
                 ok
             }
-            0x5b => {
-                if t != me && Some(t) != partner && u.act == 2 && u.npc != 1 {
+            0x5b
+                if t != me && Some(t) != partner && u.act == 2 && u.npc != 1 => {
                     u.act = 0;
                     u.turn_flags = 0;
                     u.ap_carry = if ed < u.ap as i32 { ed as i16 } else { u.ap };
@@ -757,10 +757,7 @@ impl Battle {
                     }
                     u.ap = u.ap_base + u.ap_carry;
                     true
-                } else {
-                    false
                 }
-            }
             _ => false,
         };
         // FUN_0046136c draws the unit back into the surface for these.
@@ -982,8 +979,8 @@ impl Battle {
                 }
                 ok = true;
             }
-            0x3a => {
-                if !shielded(self.unit(t)) {
+            0x3a
+                if !shielded(self.unit(t)) => {
                     let u = self.unit_mut(t);
                     let i = 3; // FUN_0043c7a1(8)
                     if u.buffs & buff::NAUSEA == 0 {
@@ -994,7 +991,6 @@ impl Battle {
                     }
                     set_turns_a(u, i, ok, turns);
                 }
-            }
             _ => {}
         }
         cast.hits.push(TargetHit { unit: t, amount: v, affected: ok });

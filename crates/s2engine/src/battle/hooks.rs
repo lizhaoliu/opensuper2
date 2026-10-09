@@ -179,10 +179,13 @@ pub fn units_adjacent(game: &mut Game, a: eh::UnitRef, b: eh::UnitRef) -> bool {
     let odd = ua.y & 1 != 0;
     let right = if odd { ua.x + 1 } else { ua.x };
     let left = if odd { ua.x } else { ua.x - 1 };
-    (ub.x == right && ub.y == ua.y - 1)
+    // The original's four neighbour comparisons, in its order.
+    #[allow(clippy::nonminimal_bool)]
+    let adjacent = (ub.x == right && ub.y == ua.y - 1)
         || (ub.x == left && ub.y == ua.y + 1)
         || (ub.x == left && ub.y == ua.y - 1)
-        || (ub.x == right && ub.y == ua.y + 1)
+        || (ub.x == right && ub.y == ua.y + 1);
+    adjacent
 }
 
 /// Port of FUN_00425fbe.
@@ -724,7 +727,7 @@ pub fn army_unit_action(game: &mut Game, side: eh::Side, ev: EvArgs) -> bool {
             // FUN_0040a443(&DAT_00492af0, unit): the AI plays this unit.
             super::turn::ai_act(game, r);
         }
-        13 | 14 | 15 => {
+        13..=15 => {
             let set = match ev.sub {
                 13 => 1,
                 14 => 2,
@@ -1161,6 +1164,9 @@ pub fn battle_talk_end(game: &mut Game, u: eh::UnitRef, saved: TalkSave) {
 
 // ---- spells::EffectHooks ------------------------------------------------------------
 
+/// A teleport: (unit, from, to).
+pub type Teleport = (UnitRef, (i32, i32), (i32, i32));
+
 /// The battle side of `spells::EffectHooks`. `cast_spell` / `use_item` only
 /// hold the `Battle`, so a death is marked at once (later effects of the same
 /// cast see the unit dead, as in the original) and the death sequence with
@@ -1171,7 +1177,7 @@ pub struct BattleEffects {
     pub died: Vec<(UnitRef, i32)>,
     pub summoned: Vec<UnitRef>,
     /// (unit, from, to)
-    pub teleported: Vec<(UnitRef, (i32, i32), (i32, i32))>,
+    pub teleported: Vec<Teleport>,
     pub free_moves: Vec<UnitRef>,
     /// (unit drawn, message index)
     pub messages: Vec<(UnitRef, usize)>,

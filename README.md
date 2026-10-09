@@ -17,8 +17,18 @@ cites the `FUN_xxxxxxxx` it reproduces; see `docs/coverage.md`): opening
 movies, title, campaign story and events, battles with the original rules,
 RNG and AI, magic, items, class changes, world map, towns, shops, church,
 deployment, save/load (original `SAVE\UJnn.SAV` format), settings,
-two-player battles and the ending. Remaining work is polish and bug fixing,
-driven by playtesting and the `s2auto` campaign harness.
+two-player battles and the ending; an optional enhanced enemy AI is off by
+default.
+
+Verification: the original program runs headlessly as an oracle
+(`docs/oracle.md`) and is compared with the port pixel by pixel and save by
+save. The regression gate `tools/oracle/check.sh` (41 scripts, 2135 shots) is
+all identical; a sweep over every stage, story branch, cave, town visit and
+two-player battlefield (`tools/oracle/sweep.sh`, 148 checks) has identical
+RNG draws and saves everywhere and 140 checks identical shot for shot. The
+few remaining frame differences and the per-area state are listed at the top
+of `docs/battle-port-status.md`, `docs/flow-port-status.md`,
+`docs/view-port-status.md` and `docs/qa-status.md`.
 
 ## Playing
 
@@ -41,12 +51,14 @@ Windows; elsewhere pass `--soundfont FILE.sf2`.
 | Path | What |
 |------|------|
 | `crates/s2data` | readers for the original file formats |
-| `crates/s2tool` | command-line dumpers (`s2tool`, `s2gfx`, `s2text`, ...) |
-| `crates/s2engine` | game logic, written against a small `Sys` (back buffer, clock, input); `s2run` headless runner |
+| `crates/s2tool` | command-line dumpers (`s2tool`, `s2gfx`, `s2text`, `s2tables`, `s2audio`) |
+| `crates/s2engine` | game logic, written against a small `Sys` (back buffer, clock, input); `s2run` headless runner, `s2auto` campaign harness |
 | `crates/s2app` | desktop frontend (`opensuper2`): winit window, scaling, keyboard/mouse |
-| `docs/` | format and behaviour notes |
+| `docs/` | format and behaviour notes (`formats*.md`, `rules.md`, `ai.md`, ...); port status (`*-port-status.md`, `qa-status.md`), oracle (`oracle.md`), coverage audit (`coverage.md`) |
 | `re/symbols.tsv` | names given to functions of the original executable |
-| `tools/` | reverse-engineering helpers (PECompact2 unpacker, Ghidra scripts) |
+| `tools/oracle/` | the original program as a headless oracle: `check.sh` (regression gate), `sweep.sh`, `compare.py`, fixtures, scripts |
+| `tools/` | reverse-engineering helpers: `unpack_pec2.py` (PECompact2 unpacker), `ghidra_scripts/`, `fn.sh`, `dis.py` / `disasm.py`, `jt.py`, `casemap.py`, `find_switches.py`, `copycalls.py`, `exestr.py`, `merge_decomp.py`; `ai_eval.sh` (enhanced AI evaluation) |
+| `tools/explore/` | one-off format exploration scripts (kept for reference, see its README) |
 
 ## Build and run
 

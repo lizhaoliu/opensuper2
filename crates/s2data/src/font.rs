@@ -259,6 +259,7 @@ impl Font {
     }
 
     /// Draw one glyph cell with its top-left at (x, y).
+    #[allow(clippy::too_many_arguments)] // the original glyph blit's parameter list
     pub fn draw_glyph(&self, img: &mut Image, kind: GlyphKind, hi: u8, lo: u8, x: isize, y: isize, style: Style) {
         let Some(bits) = self.bits(kind, hi, lo) else { return };
         draw_bits(img, kind, bits, x, y, style);

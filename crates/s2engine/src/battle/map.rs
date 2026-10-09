@@ -275,7 +275,7 @@ impl Map {
             }
         }
         let h = self.height(x, y);
-        if h - 1 >= 0 {
+        if h > 0 {
             py -= (h - 1) * 0x10;
         }
         (px, py)

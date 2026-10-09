@@ -29,6 +29,7 @@ pub fn stage_end_cleanup(game: &mut Game, keep_deployed: bool) {
         let r = UnitRef::new(side, i);
         let u = game.battle.unit(r).clone();
         let npc = u.npc == 1;
+        #[allow(clippy::nonminimal_bool)] // FUN_0044414b's two tests as written
         let passes = (!npc || u.flags & flag::DEAD == 0) && (!npc || u.flags & flag::RESERVE != 0);
         let keep = if !passes {
             0

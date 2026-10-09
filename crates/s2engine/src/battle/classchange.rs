@@ -56,7 +56,7 @@ impl Battle {
         if c.change_flags != 0 && u.abilities & c.change_flags == 0 {
             return false;
         }
-        c.change_item == 0 || u.equip.iter().any(|&e| e == c.change_item)
+        c.change_item == 0 || u.equip.contains(&c.change_item)
     }
 
     /// The targets FUN_00453986 lists: promotion slots up to the first empty one, filtered by FUN_00455c85.
@@ -92,7 +92,7 @@ impl Battle {
         }
         {
             let u = self.unit_mut(r);
-            let a = if old_c.alignment < u.charm { u.charm - old_c.alignment } else { 0 };
+            let a = u.charm.saturating_sub(old_c.alignment);
             u.charm = if (a as u32) + (new_c.alignment as u32) < 0x6f { a + new_c.alignment } else { 0x6e };
         }
         let ctx = rules::Ctx::new(&t, self.difficulty, self.vs);

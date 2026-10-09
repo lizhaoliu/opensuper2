@@ -135,7 +135,7 @@ impl Battle {
         let k = a.kind as i8 as i32;
         let weapon = if u.equip[0] != 0 { self.item(u.equip[0]) } else { None };
         let (mut min, mut max, shape);
-        match (k < 1 || k > 10, weapon) {
+        match (!(1..=10).contains(&k), weapon) {
             (false, Some(w)) => {
                 let code = w.reach as i8 as i32;
                 max = code % 10;

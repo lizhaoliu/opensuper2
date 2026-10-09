@@ -154,7 +154,7 @@ impl Strip {
 fn strip_mouse(game: &mut Game, st: &mut Strip, n: usize, redraw: &mut bool) -> (i32, bool) {
     let e = game.ev;
     let (x, y) = (e.x, e.y);
-    if x < 0xc4 || 0x273 < x || y < 0x133 || 0x17b < y {
+    if !(0xc4..=0x273).contains(&x) || !(0x133..=0x17b).contains(&y) {
         if e.mods & ev::M_LBUTTON != 0 && 0xc3 < x && x < 0x272 && 0x17d < y && y < 0x192 {
             return match st.bar(x, n) {
                 Some(code) => (code, false),

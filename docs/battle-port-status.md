@@ -1,10 +1,47 @@
-# BATTLE port status (running checklist)
+# BATTLE port status
 
-Owner: BATTLE sub-task. Files: `crates/s2engine/src/battle/{mod,unit,army,map,deploy,movement,combat,stats,actions,camera,cast,turn,menu,hooks,tests}.rs`.
-Trace: `S2_BATTLE_TRACE=1` prints selections, moves, attacks, casts, deaths, phases to stderr (s2run, s2auto).
-Test-only: `S2_TEST_UNIT_HP=char:hp` caps that player character's HP at each phase start (scripted defeat runs).
+Owner: BATTLE. Files: `crates/s2engine/src/battle/*.rs` except `view*.rs` (GRAPHICS, see
+`view-port-status.md`).
 
-## Done
+## Current state
+
+**Done.** The whole battle program is ported from the original's routines (each cites its
+`FUN_xxxxxxxx`): stage start and deployment, summons, movement and terrain (teleport tiles,
+damage / refill cells), attacks with counters and deaths, the rules and RNG (`rules.rs`,
+`rng.rs`; FUN_0042422b's constants), spells of every kind incl. combos, chains, summons and
+teleports, items and the item quake, class change, story hooks and scripted moves, turn
+upkeep, objectives, victory / defeat and rewards (EXP, level-ups, drops), the original enemy
+AI (`ai.rs`, `targeting.rs`), the player command menu with the original key table, the system
+menu, cave discovery and two-player battles (`vs.rs`). Save fidelity: sprite / portrait slots
+(`slots.rs`) make every save the oracle writes byte-identical.
+
+Optional, not part of the original: the enhanced enemy AI (`ai_plus.rs`, off by default;
+`opensuper2.ini` `ai=enhanced`, s2auto `--enemy-ai enhanced`); off, the AI is the original's
+exactly.
+
+**Open.**
+- Sweep residues in battle code (docs/qa-status.md): `camera::scroll_exact`'s unit drawing for
+  a flyer / ghost right after a move (sweep checks 062, 073; FUN_00426b87's act-4 branch) and
+  the shading of party units after stage 15's turn-1 deploy event (015).
+- Data-unreachable corners, deliberately left as they are (no spell uses them): kind 2 without
+  a combo pays MP from whatever unit the last combo probe left at +0x0c (the port lets nobody
+  pay); a cost-0 kind-2 chain stops after one hit (the original would loop).
+
+**How to verify.**
+- `cargo test --release -p s2engine` (battle tests read the game data from `S2_GAME_DIR`,
+  default `~/games/super2sp/extracted/app`; skipped without it).
+- `tools/oracle/check.sh`: the battle scripts (`stage1`, `combat`, `battle_r0_*`, `battle_r1_*`,
+  `battle_vs`, `spells_r0_005`, `view_*`, `cave*`, `ending*`) are all shot- and save-identical.
+- Traces: `S2_BATTLE_TRACE=1` (selections, moves, attacks, casts, deaths, phases),
+  `S2_RNG_TRACE=1|2` (every draw; the oracle's `--watch 46d776,46d7ca`), `S2_PRESENT_TRACE=1`.
+  Test-only: `S2_TEST_UNIT_HP=char:hp` caps a character's HP at each phase start.
+- Enhanced AI: `tools/ai_eval.sh` (original vs enhanced over 17 natural turn-1 saves).
+
+## History
+
+The running checklist as written during the port (oldest first).
+
+### Done
 - Runtime structs, deployment, summons (FUN_0043e5dd); movement; combat via `battle::rules`; EXP / level-up log.
 - Attack + counters + death (actions.rs) with BattleTalk / UnitDown polls; forecast, reward, level-up panels.
   The attack frame loop of FUN_00436e46 / FUN_00437b9c: hit shake from FUN_0043a1b0(frame + 2) = 0 to the last
@@ -85,7 +122,7 @@ Test-only: `S2_TEST_UNIT_HP=char:hp` caps that player character's HP at each pha
 - Story flags in battle code audited against 0x494508 + k − 1: FUN_0044fae0 writes flags 8 / 6
   (fixed); the magic / technique seals are flags 9 / 10 (`battle::sync`, now also at the command loop).
 
-## Oracle coverage (mid/late game)
+### Oracle coverage (mid/late game)
 Fixtures: `tools/oracle/make_battle_fixtures.sh` (s2auto `--god` turn-1 autosaves → ~/games/super2sp/dump/oracle/fixtures).
 Scripts (tools/oracle/scripts, run by check.sh): load slot 1, then 2–3 turns of 自動作戰 with shots every 100 frames.
 
@@ -182,7 +219,7 @@ Enhanced enemy AI (not the original; `battle/ai_plus.rs`):
 - Tests: `ai_plus::tests` (threat map coverage / no RNG, priority, plans put the unit back).
 Next: stages 6 / 75 are TABLES'.
 
-## Next / known gaps
+### Next / known gaps
 - s2auto (AI alone) after the constants fix: stages 6 (沙盜營地) and 75 (驅離守衛) stall (25+ turns without an
   attack, mounted units side by side); not yet checked against the original (an oracle run of the stage).
 - GRAPHICS owns the remaining TODO(view) / TODO(ui) markers in battle/* (incl. the spell aim overlay

@@ -50,7 +50,7 @@ impl SpriteSlots {
     pub fn assign(&mut self, kind: i16) -> u16 {
         match self.find(kind) {
             0 => {
-                let t = if kind - 1 >= self.limit() { 0x2b } else { kind - 1 };
+                let t = if kind > self.limit() { 0x2b } else { kind - 1 };
                 self.types.push(t + 1);
                 self.types.len() as u16
             }
@@ -164,7 +164,7 @@ impl Battle {
                     // 0, unknown kinds as type 1.
                     u.sprite = 0;
                     u.facing = 0;
-                    if slots.n_types > 0 && u.kind - 1 >= slots.n_types {
+                    if slots.n_types > 0 && u.kind > slots.n_types {
                         u.kind = 1;
                     }
                 }

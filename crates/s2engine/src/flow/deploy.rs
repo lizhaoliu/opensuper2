@@ -249,6 +249,7 @@ fn draw_member(game: &mut Game, r: UnitRef) {
 }
 
 /// Port of `FUN_00444bea(army, slots, n)`: choose who goes into battle.
+#[allow(clippy::needless_range_loop)] // index math as in the original's loop
 fn deploy_screen(game: &mut Game, slots: &mut [Slot]) -> Result<()> {
     let bg = game.res().dat7_image(1)?;
     let units = members(game);
@@ -618,6 +619,7 @@ fn free_slot_at(slots: &[Slot], x: i32, y: i32) -> usize {
 /// buf, 3, 1, 0)`) and drawn into the map surface (`FUN_0042652e`), so it
 /// covers ground shadows and later redraws take it as background. Page 2 gets
 /// the marked window, as the facing box (FUN_0044d7c1 mode 1) expects.
+#[allow(clippy::needless_range_loop)] // index math as in the original's loop
 fn mark_slots(game: &mut Game, slots: &[Slot], plain: &Image) {
     use crate::battle::view::unit::{cut_by_units, DrawGlobals, Placed};
     use s2data::gfx_map::{CutMode, Occlusion};

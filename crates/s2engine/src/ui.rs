@@ -73,7 +73,7 @@ pub fn banner(game: &mut Game, cx: i32, cy: i32, s: &[u8], wait: Wait) {
         return;
     };
     let len = text::strlen(s);
-    let x0 = cx - left.width as i32 - ((mid.width as i32) * len >> 2);
+    let x0 = cx - left.width as i32 - (((mid.width as i32) * len) >> 2);
     let y0 = cy - (left.height as i32) / 2;
     gfx::blit(game.scr.page(), &left, x0, y0, false);
     let mut x = x0 + left.width as i32;

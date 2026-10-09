@@ -316,7 +316,7 @@ impl Battle {
         };
         let mut climb;
         if abil & 0x10000 == 0 && stat & status::LIGHT_BODY == 0 {
-            if (dh > 4 || dh < -3) && mt == 0 {
+            if !(-3..=4).contains(&dh) && mt == 0 {
                 return -1;
             }
             climb = if dh < 1 { -dh } else { 0 };
@@ -459,7 +459,9 @@ impl Battle {
             if n.can_stop == 0 || self.no_stop_for(r, n.x as i32, n.y as i32) {
                 continue;
             }
-            if min_budget >= 1 && !((min_budget <= n.budget as i32) && !self.enemy_adjacent_cell(r.side, n.x as i32, n.y as i32)) {
+            #[allow(clippy::nonminimal_bool)] // the original's condition as written
+            let skip = min_budget >= 1 && !((min_budget <= n.budget as i32) && !self.enemy_adjacent_cell(r.side, n.x as i32, n.y as i32));
+            if skip {
                 continue;
             }
             let d = distance(x, y, n.x as i32, n.y as i32);

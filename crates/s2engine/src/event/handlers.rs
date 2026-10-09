@@ -92,15 +92,12 @@ fn choice(game: &mut Game, i: usize) -> bool {
             consume(game, i);
             false
         }
-        1..=4 => {
-            if game.campaign.flags[FLAG_CHOICE] as i16 == e.sub {
+        1..=4
+            if game.campaign.flags[FLAG_CHOICE] as i16 == e.sub => {
                 game.campaign.flags[e.a as usize] = 0;
                 game.campaign.flags[FLAG_CHOICE] = 0;
                 true
-            } else {
-                false
             }
-        }
         _ => false,
     }
 }
@@ -387,7 +384,7 @@ fn unit_state(game: &mut Game, i: usize) -> bool {
         }
         2 => bh::in_roster(game, Side::Player, e.b) || bh::in_roster(game, Side::Enemy, e.b),
         3 => bh::find_unit_any(game, Side::Player, e.b).is_none(),
-        4 | 5 | 6 => {
+        4..=6 => {
             let Some(u) = bh::find_unit_any(game, Side::Player, e.b) else { return false };
             let f = bh::unit_flags(game, u);
             match e.sub {

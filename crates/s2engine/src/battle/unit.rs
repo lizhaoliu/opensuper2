@@ -321,6 +321,7 @@ impl Wr {
 
 impl Unit {
     /// Decode a raw record (e.g. from a save file).
+    #[allow(clippy::just_underscores_and_digits)] // `_044`: named after its unknown offset
     pub fn from_bytes(b: &[u8; UNIT_SIZE]) -> Unit {
         let mut r = Rd(b, 0);
         let slot = r.i16();

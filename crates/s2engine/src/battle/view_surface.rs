@@ -171,7 +171,7 @@ impl Surf<'_> {
         for side in [s, 1 - s] {
             for k in 0..self.looks[side].len() {
                 let o = self.looks[side][k];
-                if self.units[side].get(k).map_or(true, |g| g.sprite.is_none()) || !o.is_baked() || skip.contains(&(side, k)) {
+                if self.units[side].get(k).is_none_or(|g| g.sprite.is_none()) || !o.is_baked() || skip.contains(&(side, k)) {
                     continue;
                 }
                 if (o.x, o.y) == (at.0, at.1) || o.x < at.0 - 2 || o.x > at.0 + 2 || o.y > at.1 + 0x18 || o.y < at.1 - 0x18 {
@@ -254,7 +254,7 @@ impl Surf<'_> {
         // (FUN_00436e46 around the hit flash) nor erased when a redraw of its
         // neighbours drew it (FUN_00437b9c), unless it moved or left the map.
         if g.held && l.act != ACT_DONE {
-            let gone = g.drawn.map_or(false, |d| {
+            let gone = g.drawn.is_some_and(|d| {
                 !l.on_map() || (d.look.x, d.look.y, d.w, d.h) != (l.x, l.y, sp.width, sp.height)
             });
             return if gone { Fix::Erase } else { Fix::Keep };

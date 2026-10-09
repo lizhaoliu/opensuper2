@@ -291,11 +291,10 @@ pub fn player_phase(game: &mut Game) -> i32 {
                             unit_info(game, Side::Enemy, cx, cy);
                         }
                     }
-                    4 => {
-                        if next_unit(game, &mut cycle) == 0 {
+                    4
+                        if next_unit(game, &mut cycle) == 0 => {
                             auto = 0;
                         }
-                    }
                     _ => {}
                 }
                 redraw_status = true;
@@ -1124,11 +1123,10 @@ pub fn command_loop(game: &mut Game, r: UnitRef, mut code: i32) -> i32 {
                     draw_menu(game, r, &mut menu);
                 }
             }
-            -0x21 => {
-                if presenting(game) {
+            -0x21
+                if presenting(game) => {
                     cursor::draw_present(game, None, true);
                 }
-            }
             _ => {}
         }
     }
@@ -1770,7 +1768,9 @@ pub(crate) fn unit_info(game: &mut Game, side: Side, x: i32, y: i32) -> bool {
     }
     let u = game.battle.army(side).units[id - 1].clone();
     let hidden = game.battle.is_hidden(side, &u);
-    if (game.campaign.vs_mode && side.index() as i32 != game.battle.vs_side && hidden) || (!game.campaign.vs_mode && side == Side::Enemy && hidden) {
+    #[allow(clippy::nonminimal_bool)] // the original's two cases (VS / campaign) kept apart
+    let unseen = (game.campaign.vs_mode && side.index() as i32 != game.battle.vs_side && hidden) || (!game.campaign.vs_mode && side == Side::Enemy && hidden);
+    if unseen {
         return false;
     }
     set_click_mode(game, 0xb);
@@ -1788,7 +1788,9 @@ pub(crate) fn show_unit_range(game: &mut Game, side: Side, x: i32, y: i32) -> bo
     let r = UnitRef::new(side, id - 1);
     let u = game.battle.unit(r).clone();
     let hidden = game.battle.is_hidden(side, &u);
-    if (game.campaign.vs_mode && side.index() as i32 != game.battle.vs_side && hidden) || (!game.campaign.vs_mode && side == Side::Enemy && hidden) {
+    #[allow(clippy::nonminimal_bool)] // the original's two cases (VS / campaign) kept apart
+    let unseen = (game.campaign.vs_mode && side.index() as i32 != game.battle.vs_side && hidden) || (!game.campaign.vs_mode && side == Side::Enemy && hidden);
+    if unseen {
         return false;
     }
     let act = u.act;

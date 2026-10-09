@@ -123,7 +123,7 @@ pub fn difficulty_menu(game: &mut Game) -> Result<bool> {
                     } else {
                         game.wait_event(ev::MOUSE_UP);
                         let (x, y) = (e.x, e.y);
-                        if x < 0xf8 || x > 0x1b5 || y < 0x109 || y > 0x194 {
+                        if !(0xf8..=0x1b5).contains(&x) || !(0x109..=0x194).contains(&y) {
                             if x > 0x10f && y > 0x19a && x < 0x19d && y < 0x1b7 {
                                 action = 0x39;
                             }

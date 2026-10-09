@@ -129,7 +129,7 @@ impl MemberList {
                 return Some(true);
             }
             if y < 0xcd {
-                if n < 0xb || y < 0x28 || 0xcb < y {
+                if n < 0xb || !(0x28..=0xcb).contains(&y) {
                     return Some(false);
                 }
                 let mut t = (n as i32 * (y - 0x28)) / 0xa3;
@@ -356,7 +356,7 @@ fn equip_screen(game: &mut Game, mut ml: MemberList, fade: bool) -> Result<i32> 
                     continue;
                 }
                 let mut release = true;
-                if x < 0x3e || 0xeb < x || y < py + 0x16 || py + 0xe4 < y {
+                if !(0x3e..=0xeb).contains(&x) || y < py + 0x16 || py + 0xe4 < y {
                     let il = &mut lists[slot];
                     if n_items > 0 && 0xee < x && x < 0x103 && py + 0x33 <= y && y <= py + 0xe6 {
                         if y <= py + 0x4a {
@@ -579,7 +579,7 @@ fn item_screen(game: &mut Game, mut ml: MemberList, fade: bool) -> Result<i32> {
                 }
                 let (x, y) = (e.x, e.y);
                 let n_items = il.ids.len();
-                if 0x2d <= x && x <= 0xf4 && py + 0x25 <= y && y < py + 0xd4 {
+                if (0x2d..=0xf4).contains(&x) && py + 0x25 <= y && y < py + 0xd4 {
                     let row = ((y - py - 0x25) / 0x23) as usize;
                     if il.top + row < n_items && game.battle.item_equippable(game.battle.unit(r), il.ids[il.top + row]) {
                         if row != il.sel {
@@ -620,7 +620,7 @@ fn item_screen(game: &mut Game, mut ml: MemberList, fade: bool) -> Result<i32> {
                     continue;
                 }
                 let mut release = true;
-                if n_items >= 1 && 0xf <= x && x <= 0x22 && py + 0x11 <= y && y <= py + 0xe6 {
+                if n_items >= 1 && (0xf..=0x22).contains(&x) && py + 0x11 <= y && y <= py + 0xe6 {
                     if y <= py + 0x28 {
                         if il.sel >= 1 {
                             il.sel -= 1;
@@ -1168,14 +1168,13 @@ pub fn class_change(game: &mut Game, r: UnitRef, keep_ap: bool) -> Result<i32> {
                             full = true;
                         }
                     }
-                    scan::UP | scan::DOWN => {
-                        if n > 4 {
+                    scan::UP | scan::DOWN
+                        if n > 4 => {
                             let s = if sel < 4 { sel + 4 } else { sel - 4 };
                             sel = s.min(n - 1);
                             warp = true;
                             full = true;
                         }
-                    }
                     _ => {}
                 },
                 ev::MOUSE_DOWN | ev::MOUSE_MOVE => {

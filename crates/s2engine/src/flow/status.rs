@@ -206,7 +206,7 @@ pub fn status_list(game: &mut Game, town: bool) -> Result<i32> {
                     let (x, y) = (e.x, e.y);
                     last = (x, y);
                     if x < 600 {
-                        let row = if 5 <= y && y <= 0x7a {
+                        let row = if (5..=0x7a).contains(&y) {
                             Some(0)
                         } else if top + 1 < n && 0x7a < y && y < 0xf1 {
                             Some(1)
@@ -233,8 +233,8 @@ pub fn status_list(game: &mut Game, town: bool) -> Result<i32> {
                             || (sel == 1 && 0x7e < y && y < 0xee)
                             || (sel == 2 && 0xf4 < y && y < 0x164)
                             || (sel == 3 && 0x16a < y && y < 0x1da);
-                        if x < 0x268 || 0x27b < x {
-                            if x < 0xc || 0x68 < x {
+                        if !(0x268..=0x27b).contains(&x) {
+                            if !(0xc..=0x68).contains(&x) {
                                 if 0x207 < x && x < 600 && in_row {
                                     action = 0x1c;
                                 }
@@ -314,7 +314,7 @@ pub fn status_list(game: &mut Game, town: bool) -> Result<i32> {
                         redraw = true;
                     }
                 } else {
-                    top = if top < 4 { 0 } else { top - 4 };
+                    top = top.saturating_sub(4);
                     full = true;
                 }
             }
@@ -339,13 +339,12 @@ pub fn status_list(game: &mut Game, town: bool) -> Result<i32> {
                     full = true;
                 }
             }
-            0x4f => {
-                if (top as i32) < n as i32 - 4 {
+            0x4f
+                if (top as i32) < n as i32 - 4 => {
                     top = n - 4;
                     sel = 0;
                     full = true;
                 }
-            }
             _ => {}
         }
     }
@@ -518,6 +517,7 @@ fn abilities_page(game: &mut Game, r: UnitRef) -> Result<()> {
 }
 
 /// Port of `FUN_00450ffe`: weapon and school proficiencies.
+#[allow(clippy::needless_range_loop)] // index math as in the original's loop
 fn proficiency_page(game: &mut Game, r: UnitRef) -> Result<()> {
     let img = game.res().ui_image(0xe8)?;
     let py = 0x1e0 - img.height as i32;

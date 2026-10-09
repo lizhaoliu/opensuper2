@@ -1,5 +1,6 @@
 //! Battle tests against the user's game data (`S2_GAME_DIR`, default
 //! ~/games/super2sp/extracted/app). Each test is skipped when the data is absent.
+#![allow(clippy::field_reassign_with_default)] // fixtures set unit fields one by one
 
 use std::path::PathBuf;
 use std::rc::Rc;

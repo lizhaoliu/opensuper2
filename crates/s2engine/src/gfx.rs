@@ -127,6 +127,7 @@ pub fn set_palette(game: &mut Game, pal6: &[u8]) {
 /// palette scale `FUN_00474fc3` re-presents and then drains every pending
 /// event (`FUN_00474c54(0xffff)`, so input during a fade is lost), and
 /// `FUN_00473144` presents again.
+#[allow(clippy::needless_range_loop)] // index math as in the original's loop
 pub fn fade(game: &mut Game, pal6: &[u8], dir: i32, speed: i32) {
     let step = if speed < 0 { speed.unsigned_abs() as usize } else { 1 };
     let src: [[u8; 3]; 256] = if dir == 0 { vga_to_rgb(pal6) } else { game.scr.hw };

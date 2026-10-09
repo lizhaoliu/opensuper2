@@ -1,9 +1,37 @@
 # FLOW/UI port status
 
-Running checklist for the FLOW/UI port (title, menus, between-stage flow,
-save/load, settings, ending). Updated as work proceeds.
+Owner: FLOW. Title, menus, story flow between battles, towns, save/load, settings,
+deployment, ending. Files: `crates/s2engine/src/flow/*.rs`, `ui.rs`, `event/`, `sys.rs`.
 
-## Done and verified (s2run screenshots in `~/games/super2sp/dump/flow/run*/`)
+## Current state
+
+**Done.** Opening movies, title, difficulty, prologue, dialogue / narration / choices, stage
+setup and the battle loop hand-off, world map and town hub, inn (world-map viewer, equipment,
+items with their spell-book windows, status list and unit status with the 魔法 / 招式 tabs),
+shops, church (donation, revival), class change, march / loading / disc-change pause,
+deployment (incl. auto-fill), save / load with autosaves 51–53 (original `SAVE\UJnn.SAV`
+format, byte-identical), settings and `SUPERSP.CFG`, 總檢表 and the map overview, two-player
+setup, caves, end-of-stage army cleanup and the ending in all eight variants.
+
+**Open.** Nothing known from the oracle in FLOW code. Known deviation: with an empty shop /
+temple list the original would index garbage on Enter; the port ignores the key.
+
+**How to verify.**
+- `tools/oracle/check.sh`: the FLOW scripts (`title`, `town`, `inn`, `shop`, `church`,
+  `saveload`, `settings`, `worldmap`, `after1`, `deploy`, `versus`, `classchange*`, `cave`,
+  `cave_return`, `ending`, `ending_73`..`ending_80`, `ending_r0`, `ending_r1`) are all shot-,
+  save- and CFG-identical.
+- `tools/oracle/sweep.sh` town mode checks every 10th between-stages save (inn, shop,
+  departure, march, deployment, battle) against the original.
+- Headless jumps: `S2_TEST_SCREEN=ending:<slot>` / `picture:b,c,d` (s2run).
+- `cargo test --release -p s2engine` (`save_then_load_round_trips`, army cleanup tests,
+  `mouse_flood_does_not_delay_clicks`).
+
+## History
+
+The running checklist as written during the port (oldest first). "In progress" and "Open (routed)" items below are done: BATTLE's system menu opens `settings::system_submenu`, and the in-battle facing picker is shot-identical (`classchange_battle.s2`).
+
+### Done and verified (s2run screenshots in `~/games/super2sp/dump/flow/run*/`)
 
 - Title, difficulty, prologue, stage setup, dialogue/choices (steps 1–7).
 - Save/load screen `FUN_00430405` (+ writer `FUN_004312c4`, loader `FUN_00431845`,
@@ -59,13 +87,13 @@ save/load, settings, ending). Updated as work proceeds.
   route-0 stage-4 regression. Stage-end effects (`view::motion::stage_end`) called as in
   `FUN_0040d108`; enemy recolour (tint 0xb) in the status/deploy/ending sprites (`FUN_0045292a`).
 
-## In progress / next
+### In progress / next
 
 1. BATTLE's system menu calls `settings::open(game, 1)` for 系統設定; the original
    opens `FUN_0042d7cc` = `settings::system_submenu` there. BATTLE also has its own
    `overview_picture`; `status::overview_menu` / `map_overview` are the FLOW ports.
 
-## Coordinator items
+### Coordinator items
 
 - Mouse-flood fix in `sys.rs` (`set_mouse` coalescing, test `mouse_flood_does_not_delay_clicks`)
   and `timeBeginPeriod(1)` in `s2app/main.rs`: kept. `sys.rs` only gained the
@@ -90,7 +118,7 @@ save/load, settings, ending). Updated as work proceeds.
 - Step B: stage loop uses BATTLE's map/armies and the VIEW API; BATTLE has wired
   `player_phase` / `enemy_phase` / rewards into `flow/stage.rs` (verified, not edited by me since).
 
-## Oracle verification (`docs/oracle.md`)
+### Oracle verification (`docs/oracle.md`)
 
 `tools/oracle/check.sh` runs every script in `tools/oracle/scripts/` against the
 original (screens pixel by pixel, written saves/CFG byte by byte). Mine: stage1,
@@ -146,7 +174,7 @@ script. Open (routed): the facing picker after an in-battle command
 (FUN_0044d7c1) draws its arrows over the units in front; the original lets
 them cover the arrows (repro: dump/oracle/repro/classchange_battle_facing.s2).
 
-## Known issues / deviations
+### Known issues / deviations
 
 - Shop/temple guards: with an empty list the original would index garbage on Enter;
   the port ignores the key.

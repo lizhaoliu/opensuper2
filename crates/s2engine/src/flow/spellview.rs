@@ -230,7 +230,7 @@ fn menu(game: &mut Game, r: UnitRef, lists: &[(usize, Vec<u16>)]) {
                         moved = true;
                     }
                     let (x, y) = (e.x, e.y);
-                    let icon = if x < MX + 0x1a || MX + 0x1fa < x || y < MY + 0xe || MY + 0x2e < y {
+                    let icon = if !(MX + 0x1a..=MX + 0x1fa).contains(&x) || !(MY + 0xe..=MY + 0x2e).contains(&y) {
                         None
                     } else {
                         let c = ((x - MX - 0x1a) / 0x22) as usize;
@@ -242,7 +242,7 @@ fn menu(game: &mut Game, r: UnitRef, lists: &[(usize, Vec<u16>)]) {
                     };
                     if e.mods & ev::M_LBUTTON != 0 {
                         game.wait_event(ev::MOUSE_UP);
-                        if MX + 0x1ea <= x && x < MX + 0x271 && MY + 0xb <= y && y < MY + 0x5f {
+                        if (MX + 0x1ea..MX + 0x271).contains(&x) && (MY + 0xb..MY + 0x5f).contains(&y) {
                             let k = ((x - MX - 0x1ea) / 0x2d + ((y - MY - 0xb) / 0x1c) * 3) as usize;
                             if k < n_rows && k != row {
                                 col = 0;
@@ -250,7 +250,7 @@ fn menu(game: &mut Game, r: UnitRef, lists: &[(usize, Vec<u16>)]) {
                                 row = k;
                             }
                         }
-                        if MX + 0x14 <= x && x < MX + 0x88 && MY + 0x37 <= y && y < MY + 0x58 {
+                        if (MX + 0x14..MX + 0x88).contains(&x) && (MY + 0x37..MY + 0x58).contains(&y) {
                             code = 3;
                         } else if icon.is_some_and(|c| c < cols(row)) {
                             code = 4;

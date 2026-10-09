@@ -508,7 +508,7 @@ pub fn run(game: &mut Game, opts: &Opts) -> Result<Vec<StageRecord>> {
 fn goal_report(game: &Game, stage: u16) {
     let hero = if game.campaign.route == 0 { 11 } else { 1 };
     let a = game.battle.army(crate::battle::Side::Player);
-    let at = a.find_char(hero, 2).map(|i| &a.units[i]).filter(|u| u.on_map()).map(|u| (u.x as i32, u.y as i32));
+    let at = a.find_char(hero, 2).map(|i| &a.units[i]).filter(|u| u.on_map()).map(|u| (u.x, u.y));
     let Some(m) = game.battle.map.as_ref() else { return };
     let cells = |class: u16| -> Vec<(i32, i32)> {
         (0..m.rows()).flat_map(|y| (0..m.width()).map(move |x| (x, y))).filter(|&(x, y)| m.object_class(x, y) == class).collect()
@@ -599,7 +599,7 @@ fn boss_rush(game: &mut Game, stage: u16) {
         emit(&format!("BOSS-RUSH stage={stage}: no leader on the map"));
         return;
     };
-    let (bx, by) = (boss.x as i32, boss.y as i32);
+    let (bx, by) = (boss.x, boss.y);
     let m = b.map();
     let odd = by & 1 != 0;
     let cells = [

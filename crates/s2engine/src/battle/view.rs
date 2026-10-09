@@ -750,7 +750,7 @@ fn draw_scene(game: &mut Game, lifted: bool, with_cursor: bool, with_range: bool
     // from there (FUN_0044e210 draws it before its last frame).
     let mut active: Vec<(usize, usize)> = (0..2)
         .flat_map(|s| (0..lk[s].len()).map(move |i| (s, i)))
-        .filter(|&(s, i)| lk[s][i].on_map() && !lk[s][i].is_baked() && v.units[s].get(i).map_or(false, |g| g.drawn.is_none()))
+        .filter(|&(s, i)| lk[s][i].on_map() && !lk[s][i].is_baked() && v.units[s].get(i).is_some_and(|g| g.drawn.is_none()))
         .collect();
     active.sort_by_key(|&(s, i)| lk[s][i].y);
     for (s, i) in active {
@@ -848,6 +848,7 @@ pub fn erase_on_page(game: &mut Game, r: UnitRef) {
 /// Port of FUN_0044007a(army, x, y, same_cell): draw the units of `side`
 /// around cell (x, y) onto the current page (FUN_0043ff88), not lifted ones,
 /// nor one on the cell itself unless `same_cell`.
+#[allow(clippy::needless_range_loop)] // index math as in the original's loop
 pub fn draw_around(game: &mut Game, side: Side, x: i32, y: i32, same_cell: bool) {
     sync_scroll(game);
     sync_sprites(game);
@@ -1916,7 +1917,8 @@ mod tests {
         for (k, f) in fr.iter().enumerate() {
             save(&dump, &format!("panel_seq_{k:02}"), f, &pal);
         }
-        assert!(!motion::location_name(&game, px, py).is_empty() || true);
+        // Only exercised (some cells have no name).
+        let _ = motion::location_name(&game, px, py);
     }
 
     /// The backdrop page (page 1 via `camera::redraw`, FUN_00424c5f) must

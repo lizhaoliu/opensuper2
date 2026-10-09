@@ -453,6 +453,7 @@ impl Battle {
     /// current cell, or an attack with a target from the current cell or
     /// from a stop cell of the range (not a bridge for walkers). As in the
     /// original the unit is not put back between actions, only at the end.
+    #[allow(clippy::if_same_then_else)] // magic, then techniques, then attacks: FUN_0040bc9e's order
     pub fn target_reachable(&mut self, r: UnitRef, limit: i32) -> bool {
         let (x0, y0) = (self.unit(r).x, self.unit(r).y);
         let probe = |b: &mut Battle, technique: bool| {

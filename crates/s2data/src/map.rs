@@ -199,7 +199,7 @@ impl BattleMap {
         if row < 1 || row >= self.rows() || col >= self.width {
             return None;
         }
-        if row % 2 == 0 && (col == 0 || col == self.width - 1) {
+        if row.is_multiple_of(2) && (col == 0 || col == self.width - 1) {
             return None;
         }
         self.cells.get(row * self.width + col)

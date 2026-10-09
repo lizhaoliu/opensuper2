@@ -109,6 +109,7 @@ fn read_save(game: &Game, slot: usize) -> Result<SaveFile> {
 /// Port of FUN_0040f67f (with FUN_0040f418 and FUN_00443482): set up a
 /// two-player battle on FSTAGE battlefield `stage` between the player
 /// armies of save slots `blue` and `red` (1-based).
+#[allow(clippy::needless_range_loop)] // index math as in the original's loop
 pub fn start(game: &mut Game, stage: usize, blue: usize, red: usize) -> Result<VsTotals> {
     // FUN_0040e5db sets DAT_00494668 right before.
     game.campaign.vs_mode = true;
@@ -130,7 +131,7 @@ pub fn start(game: &mut Game, stage: usize, blue: usize, red: usize) -> Result<V
     c.alt_next_stage = 0;
     c.cave_found = false;
     c.difficulty = 5;
-    c.music = sstage.header.music as u16;
+    c.music = sstage.header.music;
     c.next_stage = 0;
     c.between_stages = false;
     for t in game.events.treasure.iter_mut().take(5) {
@@ -233,11 +234,10 @@ pub fn phase(game: &mut Game, side: Side) -> i32 {
                             menu::unit_info(game, side.other(), cx, cy);
                         }
                     }
-                    4 => {
-                        if menu::next_unit_of(game, side, &mut cycle) == 0 {
+                    4
+                        if menu::next_unit_of(game, side, &mut cycle) == 0 => {
                             auto = 0;
                         }
-                    }
                     _ => {}
                 }
                 redraw_status = true;

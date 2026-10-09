@@ -547,7 +547,7 @@ impl Recorder {
         if self.done {
             return;
         }
-        if t > 0 && t % self.shot_every == 0 {
+        if t > 0 && t.is_multiple_of(self.shot_every) {
             self.at(t);
             self.steps.push(format!("shot f{t:06}"));
         }
@@ -1181,7 +1181,7 @@ fn summary(results: &[RouteResult]) -> String {
                 row.name
             );
         }
-        let furthest = r.rows.iter().filter(|x| x.code == Some(1)).last();
+        let furthest = r.rows.iter().rfind(|x| x.code == Some(1));
         s += &format!(
             "  furthest won stage: {}\n",
             furthest.map_or("none".to_string(), |x| format!("#{} stage {} {}", x.index, x.stage, x.name))

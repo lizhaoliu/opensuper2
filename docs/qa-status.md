@@ -1,10 +1,47 @@
 # QA status (s2auto / oracle checks)
 
-Working notes of the campaign QA harness (`crates/s2engine/src/qa.rs`,
-`crates/s2engine/src/bin/s2auto.rs`); newest first. Runs live in
-`~/games/super2sp/dump/auto/<run>/`.
+Campaign QA harness: `crates/s2engine/src/qa.rs`, `crates/s2engine/src/bin/s2auto.rs`,
+`tools/oracle/sweep.sh`. Runs live in `~/games/super2sp/dump/auto/<run>/`, sweep results in
+`~/games/super2sp/dump/oracle/sweep/`.
 
-## 2026-10-08 (6): forced sweep after the BATTLE / GRAPHICS / FLOW fixes
+## Current state
+
+**Done.**
+- `tools/oracle/check.sh` (41 scripts): 2135/2135 shots identical, every written save / CFG
+  identical.
+- Oracle sweep (148 checks: every stage's turn-1 save on both routes, the story branches,
+  caves, every 10th between-stages save, VS battlefields 1–10): 146 fully identical (shots,
+  draws, saves); 039 and 097 match as far as the original ran (the port is 3 / 20 draws
+  ahead at the frame cut). Every check has identical draws and saves.
+- Campaign matrix (both routes, `--god` and default, seeds 1–3): no panic, hang or invariant
+  failure; all eight endings reached; every stage reached (19 only through forced choices /
+  flags, table in History (5)).
+- Stalls that are the original's behaviour (checked with `--oracle-check`): stage 6 after a
+  route-0 wipe (only lose code is char 1, runs to turn 100), 85 (ledges), 90, cave 134, and
+  108 / 128 (unreachable in play; 128 is an unfinished placeholder stage).
+
+**Open.** None in the sweep. (The last forced run's shot diffs — 015, 062 / 073, 012 / 102,
+055 — were fixed afterwards: story-stage facing/idle restart, aim frame by move type, army
+order in save-unders, page restore after cast effects; the regenerated table is 146/148.)
+Not coverable with the shipped data: the slay-item path (FUN_0044b41b) and the teleport
+branch of the kind-1 cast scene (see view-port-status.md).
+
+**How to verify.**
+- `tools/oracle/check.sh` — the regression gate (all identical, exit status 0).
+- `tools/oracle/sweep.sh all` (or `saves`, `collect`, `run [--force]`, `table`; env `JOBS`,
+  `FRAMES`, `SWEEP_DIR`): one `s2auto --oracle-check` per collected save; `table.md` in the
+  sweep folder.
+- One save: `s2auto --game DIR --oracle-check SAVE [--oracle-mode battle|town|vs:K]
+  [--frames N]` → `OUT/RUN/oracle-check.txt` (shots, draws, RNG diff, saves).
+- Campaign runs: `s2auto --game DIR --route both --max-stages 200 [--god]
+  [--random-choices --recover 3] [--seed N]`; coverage helpers (not the original):
+  `--caves`, `--weak-enemies`, `--boss-rush`, `--set-flag S:F[=V]`, `--choice S:K`.
+
+## History
+
+Working notes, newest first.
+
+### 2026-10-08 (6): forced sweep after the BATTLE / GRAPHICS / FLOW fixes
 
 `tools/oracle/sweep.sh run --force`, 148 checks: 140 fully identical (shots,
 draws, saves); every check now has identical draws and saves (39 and 97 equal
@@ -21,7 +58,7 @@ as far as the original got). Remaining shot differences:
   a cast target's flash tint (FUN_0044f11c) at full red where the original
   shows normal colours — effect frame-step offsets.
 
-## 2026-10-08 (5): the stages no campaign run reached
+### 2026-10-08 (5): the stages no campaign run reached
 
 From the event records (stages.txt / `s2tables stage`): each is reached from
 the turn-1 save of the stage that branches to it, with `--choice` /
@@ -51,7 +88,7 @@ the turn-1 save of the stage that branches to it, with `--choice` /
 108 and 128 stall under auto battle (s2auto kills them after 25 turns); their
 turn-1 saves come from the run's autosave with the helper's mode 6 undone.
 
-## 2026-10-08 (4): oracle sweep (tools/oracle/sweep.sh)
+### 2026-10-08 (4): oracle sweep (tools/oracle/sweep.sh)
 
 `tools/oracle/sweep.sh all` (= `saves`, `collect`, `run`, `table`): one
 `s2auto --oracle-check` per stage turn-1 save (both routes, the story branches
@@ -259,7 +296,7 @@ Causes (routed):
 
 148 checks, 140 fully identical (shots, draws, saves).
 
-## 2026-10-08 (3): stage 61/131 boss, story branches to the other caves
+### 2026-10-08 (3): stage 61/131 boss, story branches to the other caves
 
 - Stage 61/131 with the protagonist next to 克雷布特里 (`--boss-rush` turn-1
   saves): `--oracle-check` 12000 frames, 2173/2213 draws, all 43 shots and the
@@ -274,7 +311,7 @@ Causes (routed):
   36 → cave 65 龍穴, 99:1 → 102 → cave 135: all found and set up, and with
   a forced win return to 34 / 39 / 106, invariants ok.
 
-## 2026-10-08 (2): matrix m5 after the key/flush/WM_CHAR/wait_until/cave fixes
+### 2026-10-08 (2): matrix m5 after the key/flush/WM_CHAR/wait_until/cave fixes
 
 Matrix m5 (both routes, `--random-choices --recover 3 --max-stages 200`,
 `--god` and default × seeds 1–3): no panic, no hang, no invariant failure
@@ -303,7 +340,7 @@ cave spot, FUN_0044f9a1), `--weak-enemies`, `--boss-rush`,
   identical, but the 12 enemy records not yet on the map save sprite_w/h
   (+0xa4/+0xa6) as 0x80/0xa0 in the port, 0/0 in the original.
 
-## 2026-10-08: corrected rules constants (FormulaParams.p +2), oracle checks
+### 2026-10-08: corrected rules constants (FormulaParams.p +2), oracle checks
 
 - Reviewed BATTLE's `FormulaParams::parse` fix (FUN_0042422b:
   `DAT_0049456c = DAT_004a1f50 + m + 2`): correct; docs/formats-tables.md
@@ -334,7 +371,7 @@ cave spot, FUN_0044f9a1), `--weak-enemies`, `--boss-rush`,
   the goal cell (`EXIT-CHEAT ... class=4|6`); `GOAL-END` reports where the
   go-to-point AI ended (stage 34: stuck at (13,53), 17 from the flag (5,70)).
 
-### Matrix m4 (both routes, `--random-choices --recover 3`, corrected constants)
+#### Matrix m4 (both routes, `--random-choices --recover 3`, corrected constants)
 
 | run | route 0 | route 1 |
 |---|---|---|
@@ -346,7 +383,7 @@ cave spot, FUN_0044f9a1), `--weak-enemies`, `--boss-rush`,
 151 stage-start invariant checks passed, none failed. Without `--god` the
 AI-vs-AI campaign is lost within the first 10–20 stages.
 
-### Routed (fixes verified against the oracle in a scratch build)
+#### Routed (fixes verified against the oracle in a scratch build)
 
 Patches: `~/games/super2sp/dump/auto/patches/`. With both, the stage 6/75/77/85
 checks have identical RNG draw sequences (count and order) and 55/103, 65/76,

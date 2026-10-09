@@ -1,8 +1,29 @@
 # Battle view port status (GRAPHICS)
 
-Owned files: `crates/s2engine/src/battle/view*.rs`.
+Owner: GRAPHICS. Files: `crates/s2engine/src/battle/view*.rs`.
 
-## Map surface bookkeeping (`view_surface.rs`)
+## Current state
+
+**Done.** The battle view draws exactly what the original draws: the persistent map surface
+changed only by the original's explicit capture / put / erase / bake calls (table below),
+unit sprites and actions, shadows, invisibility and status tints, walks, flights and
+teleports, attack and counter frames, spell effect scenes and summons, deaths, windows,
+panels and popups, camera scrolling and palette cycling.
+
+**Open** (from the last forced sweep, docs/qa-status.md): one-shot frame differences in a
+death dissolve (FUN_0044f27e; sweep checks 012, 102) and a cast target's flash tint
+(FUN_0044f11c; 055). Not coverable with the shipped data: the slay item (FUN_0044b41b,
+ported as `hooks::play_slay`) and the effect scene's kind-1 teleport branch.
+
+**How to verify.**
+- `tools/oracle/check.sh`: 41 scripts, 2135/2135 shots identical, no file differences;
+  the view scripts are `view_status5`, `view_summon5`, `view_summondead5`, `view_cast5`
+  (fixtures: `tools/oracle/make_view_fixtures.sh`).
+- Debugging: `S2_SURFACE_DUMP=DIR:MS` writes the surface and every unit's save-under after
+  MS; `oracle.py --peek 80494800:W*H` dumps the original's (`W, H` at `0x4947f0`);
+  `S2_BATTLE_TRACE=1` logs every capture / paste / put.
+
+## Reference: map surface bookkeeping (`view_surface.rs`)
 
 The map surface (`DAT_004947f0`) is persistent and only changes the way the
 original's does:
@@ -66,12 +87,16 @@ Debugging: `S2_SURFACE_DUMP=DIR:MS` writes the surface and every unit's
 save-under after MS; `oracle.py --peek 80494800:W*H` dumps the original's
 (`W, H` at `0x4947f0`); `S2_BATTLE_TRACE=1` logs every capture / paste / put.
 
-## Oracle (2026-10-08)
+## History
+
+Status notes as written during the port.
+
+### Oracle (2026-10-08)
 
 Full check.sh: 1370/1379 before the explicit-call port, 1379/1379 after
 (every script pixel- and file-identical).
 
-## Coverage scripts (2026-10-09)
+### Coverage scripts (2026-10-09)
 
 Fixtures: `tools/oracle/make_view_fixtures.sh` (status5, summon5, cast5, summondead5;
 the edits are documented in its header). All identical against the oracle:
