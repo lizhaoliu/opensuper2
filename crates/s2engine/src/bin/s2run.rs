@@ -148,7 +148,11 @@ fn main() -> Result<()> {
             sh.request_quit();
         }
     });
-    let handle = spawn_headless(shared, hook, move |sys| s2engine::run(sys, &data));
+    let handle = spawn_headless(shared, hook, move |sys| {
+        // Sound banks loaded so sound requests allocate voices like the original.
+        let _ = sys.audio.attach(&data.arcs);
+        s2engine::run(sys, &data)
+    });
     let r = match handle.join() {
         Ok(r) => r,
         Err(p) => std::panic::resume_unwind(p),

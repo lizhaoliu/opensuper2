@@ -93,7 +93,8 @@ pub enum InputEvent {
 #[derive(Debug, Clone, Copy)]
 enum Msg {
     Key { vk: u8, down: bool, repeat: bool },
-    Button { button: u8, down: bool, x: i32, y: i32 },
+    /// The position is not part of it: the pump reads the cursor (FUN_004751a0).
+    Button { button: u8, down: bool },
     Move { x: i32, y: i32 },
     /// WM_CHAR posted by TranslateMessage after a character key's WM_KEYDOWN.
     Char,
@@ -168,7 +169,6 @@ impl Shared {
 
     pub fn push_input(&self, e: InputEvent) {
         let mut st = self.input.lock().unwrap();
-        let (x, y) = st.mouse;
         let msg = match e {
             InputEvent::KeyDown(k) => {
                 // A second key-down without a key-up is an auto-repeat.
@@ -180,8 +180,8 @@ impl Shared {
                 st.keys[k as usize] = false;
                 Msg::Key { vk: k, down: false, repeat: false }
             }
-            InputEvent::MouseDown(b) => Msg::Button { button: b & 1, down: true, x, y },
-            InputEvent::MouseUp(b) => Msg::Button { button: b & 1, down: false, x, y },
+            InputEvent::MouseDown(b) => Msg::Button { button: b & 1, down: true },
+            InputEvent::MouseUp(b) => Msg::Button { button: b & 1, down: false },
         };
         st.msgs.push_back(msg);
         drop(st);
@@ -296,7 +296,9 @@ impl Sys {
 
     /// Headless mode: virtual clock plus a hook run once per 60 Hz frame.
     pub fn new_headless(shared: Arc<Shared>, hook: FlipHook) -> Sys {
-        let mut sys = Sys::new(shared, crate::audio::Audio::silent());
+        let mut audio = crate::audio::Audio::silent();
+        audio.instant = true;
+        let mut sys = Sys::new(shared, audio);
         sys.clock = Clock::Virtual { now: 0, last_frame: 0 };
         sys.hook = Some(hook);
         sys
@@ -344,6 +346,7 @@ impl Sys {
             }
         }
         self.serial += 1;
+        self.audio.frame = self.serial;
         {
             let mut f = self.shared.frame.lock().unwrap();
             f.pixels.copy_from_slice(&self.fb.pixels);
@@ -377,6 +380,7 @@ impl Sys {
             *now = frame_at;
             *last_frame = frame_at;
             self.serial += 1;
+        self.audio.frame = self.serial;
             self.notify_and_hook(false);
             self.check_quit();
         }
@@ -464,7 +468,13 @@ impl Sys {
         let Some(msg) = self.shared.input.lock().unwrap().msgs.pop_front() else { return false };
         let time = self.ticks();
         match msg {
-            Msg::Move { x, y } => {
+            // FUN_004751a0 takes a mouse event's position from the cursor
+            // as it is now (a virtual GetCursorPos + ScreenToClient), not
+            // from the message: a click queued before the game warps the
+            // pointer (SetCursorPos onto a menu entry) lands where the
+            // pointer was warped to.
+            Msg::Move { .. } => {
+                let (x, y) = self.mouse();
                 let mods = self.mouse_mods();
                 // Consecutive moves update the pending move in place.
                 match self.pending_move {
@@ -482,7 +492,8 @@ impl Sys {
             }
             // No event (FUN_004751a0 only peeks WM_CHAR for the key code).
             Msg::Char => {}
-            Msg::Button { button, down, x, y } => {
+            Msg::Button { button, down } => {
+                let (x, y) = self.mouse();
                 self.buttons[button as usize] = down;
                 self.pending_move = None;
                 let kind = if down { ev::MOUSE_DOWN } else { ev::MOUSE_UP };
@@ -718,6 +729,22 @@ mod tests {
         let mv = s.input_get(ev::MOUSE_MOVE).unwrap();
         assert_eq!((mv.x, mv.y), (20, 30));
         assert!(s.input_get(0xffff).is_none());
+    }
+
+    #[test]
+    fn click_lands_where_the_cursor_is_when_pumped() {
+        let mut s = sys();
+        s.shared().set_mouse(560, 60);
+        s.shared().push_input(InputEvent::MouseDown(0));
+        // The game warps the pointer onto a menu entry before it pumps the
+        // click (FUN_004338f1); FUN_004751a0 then reads the warped position.
+        s.warp_mouse(256, 124);
+        let e = loop {
+            if let Some(e) = s.input_get(ev::MOUSE_DOWN) {
+                break e;
+            }
+        };
+        assert_eq!((e.x, e.y), (256, 124));
     }
 
     #[test]

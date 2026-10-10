@@ -199,8 +199,20 @@ fn parse_smf_type0(b: &[u8]) -> Result<(Vec<MidiEvent>, u32)> {
     Ok((out, (us / 1000) as u32))
 }
 
+/// `S2_SOUND_TRACE=1`: log every sound request with its frame serial.
+pub fn sound_tracing() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("S2_SOUND_TRACE").is_some())
+}
+
 /// Game-facing audio state: the play_sound / play_music logic of the original.
 pub struct Audio {
+    /// The presented-frame serial, kept current by `Sys` (for `S2_SOUND_TRACE`).
+    pub frame: u64,
+    /// Headless runs: a started voice counts as finished at once, as the
+    /// oracle's Miles stub reports every sample done, so voice allocation
+    /// (and the slots the game passes back) match the original's.
+    pub instant: bool,
     pub mixer: Arc<Mutex<Mixer>>,
     music_out: Box<dyn MusicOut>,
     sounds: Option<Bank>,
@@ -220,6 +232,8 @@ pub struct Audio {
 impl Audio {
     pub fn new(mixer: Arc<Mutex<Mixer>>, music_out: Box<dyn MusicOut>) -> Audio {
         Audio {
+            frame: 0,
+            instant: false,
             mixer,
             music_out,
             sounds: None,
@@ -259,6 +273,18 @@ impl Audio {
     /// returned by a previous call when `slot` is passed back. Returns the
     /// 1-based voice used, or 0 if the sound was dropped.
     pub fn play_sound(&mut self, arcs: &Archives, id: u16, slot: usize) -> usize {
+        if sound_tracing() {
+            // Logged at entry, like an oracle `--watch 419b1d` hook.
+            eprintln!("[sound] f{} play {id} slot {slot}", self.frame);
+        }
+        let v = self.play_sound_inner(arcs, id, slot);
+        if self.instant && v > 0 {
+            self.mixer.lock().unwrap().voices[v - 1].playing = false;
+        }
+        v
+    }
+
+    fn play_sound_inner(&mut self, arcs: &Archives, id: u16, slot: usize) -> usize {
         if self.sfx_volume == 0 || id == 0 || id > MAX_SFX_ID {
             return 0;
         }

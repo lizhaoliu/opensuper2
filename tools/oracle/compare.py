@@ -17,6 +17,7 @@ pixel differs only when the 16-bit values differ.
 import argparse
 import fcntl
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -197,6 +198,7 @@ def cache_key(args, saves):
         with open(cfg, "rb") as f:
             h.update(f.read())
     h.update(" ".join(args.oracle_arg).encode())
+    h.update(b"sound-watch-v1")  # every oracle run logs FUN_00419b1d (sound requests)
     return h.hexdigest()[:16]
 
 
@@ -221,6 +223,45 @@ def save_mask(data, n_items):
             mask.update(range(p + k * 0x16A + 0xAD, p + k * 0x16A + 0xB5))
         p += n * 0x16A + 4 + 4 + 4 + 2 + 4 + n_items + 0x21
     return mask
+
+
+SOUND_FN = "419b1d"  # FUN_00419b1d(id, slot): the game's sound request
+
+
+def sound_requests_port(path):
+    """(frame, id, slot) of every sound request s2run logged (S2_SOUND_TRACE)."""
+    out = []
+    with open(path, errors="replace") as f:
+        for line in f:
+            m = re.search(r"\[sound\] f(\d+) play (\d+) slot (\d+)", line)
+            if m:
+                out.append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
+    return out
+
+
+def sound_requests_oracle(path):
+    """(frame, id, slot) of every FUN_00419b1d call the oracle logged (--watch)."""
+    out = []
+    with open(path, errors="replace") as f:
+        for line in f:
+            m = re.search(r"\[f(\d+) t\d+\] watch FUN_00419b1d\((0x[0-9a-f]+), (0x[0-9a-f]+)", line)
+            if m:
+                out.append((int(m.group(1)), int(m.group(2), 16) & 0xffff, int(m.group(3), 16)))
+    return out
+
+
+def compare_sounds(port_log, oracle_log):
+    """Both programs' sound requests, in order: frame, sound id and voice slot."""
+    if not (os.path.exists(port_log) and os.path.exists(oracle_log)):
+        return None
+    a, b = sound_requests_port(port_log), sound_requests_oracle(oracle_log)
+    if a == b:
+        return "%-24s identical (%d requests)" % ("sounds", len(a))
+    k = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+    pa = a[k] if k < len(a) else None
+    pb = b[k] if k < len(b) else None
+    return "%-24s differ at request %d: s2run %s, original %s (%d vs %d requests)" % (
+        "sounds", k + 1, pa, pb, len(a), len(b))
 
 
 def compare_files(port_game, oracle_scratch, saves):
@@ -378,11 +419,13 @@ def main():
         game = overlay(args.game, os.path.join(out, "game"), saves)
         procs = [("s2run", subprocess.Popen([args.s2run, "--game", game, "--out", port_dir, "--script",
                                               args.script, "--frame-log", os.path.join(port_dir, "frames.log")],
-                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT))]
+                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                             env=dict(os.environ, S2_SOUND_TRACE="1")))]
         if not args.keep_oracle and not args.port_only:
             procs.append(("oracle", subprocess.Popen(
                 [sys.executable, "-I", os.path.join(HERE, "oracle.py"), "--game", args.game, "--out", oracle_dir,
-                 "--script", args.script, "--frame-log", os.path.join(oracle_dir, "frames.log")]
+                 "--script", args.script, "--frame-log", os.path.join(oracle_dir, "frames.log"),
+                 "--watch", SOUND_FN]
                 + (["--saves", saves] if saves else []) + args.oracle_arg,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)))
         for label, p in procs:
@@ -416,6 +459,12 @@ def main():
             print(line)
             lines.append(line)
             results.append({"name": line, "diff": 0 if " identical" in line else 1})
+    if not args.no_run:
+        line = compare_sounds(os.path.join(out, "s2run.txt"), os.path.join(oracle_dir, "oracle.log"))
+        if line:
+            print(line)
+            lines.append(line)
+            results.append({"name": "sounds", "diff": 0 if " identical" in line else 1})
     part = clock_split(os.path.join(port_dir, "frames.log"), os.path.join(oracle_dir, "frames.log"))
     if part:
         lines.append(part)

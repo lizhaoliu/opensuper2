@@ -251,9 +251,15 @@ impl super::Battle {
         a.sound as u8 as usize
     }
 
-    /// Attack sound of an action (action +0x0f, FUN_00439c83).
+    /// Attack sound of an action: FUN_00439c83 reads the *word* at action
+    /// +0x0f (`movsx edx, word ptr [..+0xf]`, bytes 0x0f/0x10). Reading only
+    /// the byte sign-extended every id >= 0x80 to an invalid one, so those
+    /// attacks were silent.
     pub fn action_sound(&self, skill: usize) -> u16 {
-        self.tables.as_ref().and_then(|t| t.kinds.actions.get(skill).map(|a| a.motion.0 as i16 as u16)).unwrap_or(0)
+        self.tables
+            .as_ref()
+            .and_then(|t| t.kinds.actions.get(skill).map(|a| i16::from_le_bytes([a.motion.0 as u8, a.motion.1 as u8]) as u16))
+            .unwrap_or(0)
     }
 
     /// The animation set an attack plays (`facing = (facing & 3) + set * 4`):
