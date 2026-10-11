@@ -34,6 +34,7 @@ fn scroll_target(game: &Game, x: i32, y: i32, min_row: i32) -> (i32, i32) {
 /// `unit` (with its move type, taken before the loop) is drawn over the
 /// window before the present.
 fn scroll_step(game: &mut Game, c: i32, r: i32, unit: Option<(UnitRef, i32)>) {
+    let from = view::smooth::From::now(game, None);
     {
         let m = game.battle.map_mut();
         m.scroll_y += (r - m.scroll_y).signum();
@@ -43,10 +44,18 @@ fn scroll_step(game: &mut Game, c: i32, r: i32, unit: Option<(UnitRef, i32)>) {
         return;
     }
     let t = game.ticks();
-    view::draw_map(game);
-    if let Some((u, mt)) = unit {
-        draw_scrolled_unit(game, u, mt);
-    }
+    let pre = view::smooth::Snapshot::take(game);
+    let mut draw = |game: &mut Game| {
+        view::draw_map(game);
+        if let Some((u, mt)) = unit {
+            draw_scrolled_unit(game, u, mt);
+        }
+    };
+    draw(game);
+    // Smooth motion: the step's 32 px spread over its time (at least a frame).
+    let dur = (game.cfg.screen_speed.max(0) as u32 * 10).max(16);
+    let now = game.sys.ticks();
+    view::smooth::tween(game, from, &pre, now, dur, &mut draw);
     gfx::present(game);
     let speed = game.cfg.screen_speed;
     game.wait_until(t, speed);

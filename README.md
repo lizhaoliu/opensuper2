@@ -38,7 +38,20 @@ it, or pass `--game DIR`. Music plays through the system MIDI synthesizer on
 Windows; elsewhere pass `--soundfont FILE.sf2`.
 
 - Alt+Enter or F11: toggle fullscreen (remembered).
+- F12 (Shift+F12 backwards): display filter — `nearest` (the original's
+  pixels), `sharp` (even pixel sizes at any scale), `xbr` (edge-directed
+  smoothing of the pixel art, after Hyllian's xBR level 2) or `crt`
+  (scanlines, aperture grille and glow). Filters need the GPU path (wgpu:
+  Direct3D 12 / Vulkan / OpenGL); without an adapter the frame is scaled
+  on the CPU as before.
+- F9: smooth motion on/off — in-between frames, paced to the display's
+  refresh, while units walk or fly and while the camera scrolls (the
+  original moves 32 px at a time). Each step still ends on the original's
+  frame at the original's time, and nothing else changes: with
+  `S2_SMOOTH=1` a headless run draws them too and stays shot-for-shot and
+  RNG-identical to one without.
 - `opensuper2.ini` (next to the game files): `fullscreen=0|1`,
+  `filter=nearest|sharp|xbr|crt`, `smooth=0|1`, `renderer=gpu|cpu`,
   `scaling=fit|integer`, `window=W,H`, `fade_speed=1..16` (palette fades
   N times faster; 1 matches the original under 60 Hz page flipping — the
   original's fades are untimed, so many machines ran them faster),
@@ -49,7 +62,9 @@ Windows; elsewhere pass `--soundfont FILE.sf2`.
   side; `tactical` is a threat-map AI (focus fire, objective targets,
   positioning); `enemy_boost` adds N % to enemy HP/MP/ST and attack /
   defence / 劍術 / 戰技 on top of the original's per-stage bonus.
-- Problems are written to `opensuper2.log` next to the game files.
+- Problems (and the GPU in use) are written to `opensuper2.log` next to
+  the game files. `opensuper2 --filter-shots SHOT.png DIR` renders a
+  640x480 screenshot through every filter without a window.
 
 ## Layout
 
@@ -58,7 +73,7 @@ Windows; elsewhere pass `--soundfont FILE.sf2`.
 | `crates/s2data` | readers for the original file formats |
 | `crates/s2tool` | command-line dumpers (`s2tool`, `s2gfx`, `s2text`, `s2tables`, `s2audio`) |
 | `crates/s2engine` | game logic, written against a small `Sys` (back buffer, clock, input); `s2run` headless runner, `s2auto` campaign harness |
-| `crates/s2app` | desktop frontend (`opensuper2`): winit window, scaling, keyboard/mouse |
+| `crates/s2app` | desktop frontend (`opensuper2`): winit window, GPU presentation and filters (`gpu.rs`, `present.wgsl`) with a CPU fallback, keyboard/mouse |
 | `docs/` | format and behaviour notes (`formats*.md`, `rules.md`, `ai.md`, ...); port status (`*-port-status.md`, `qa-status.md`), oracle (`oracle.md`), coverage audit (`coverage.md`) |
 | `re/symbols.tsv` | names given to functions of the original executable |
 | `tools/oracle/` | the original program as a headless oracle: `check.sh` (regression gate), `sweep.sh`, `compare.py`, fixtures, scripts |

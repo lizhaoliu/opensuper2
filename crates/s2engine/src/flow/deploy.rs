@@ -651,7 +651,7 @@ fn mark_slots(game: &mut Game, slots: &[Slot], plain: &Image) {
             for side in 0..2 {
                 cut_by_units(mv, &placed[side], side as i32, &g, s.x, s.y, &mut buf, 3, 1, 0, None);
             }
-            r.occlude(&mut buf, s.x, s.y, Occlusion { dx: 0, mode: CutMode::Solid, own_overlay: false, skip_overlay: None });
+            r.occlude(&mut buf, s.x, s.y, Occlusion { dx: 0, mode: CutMode::Solid, own_overlay: false, skip_overlay: None, shift: (0, 0) });
             mv.blit_at_cell(&mut surface, s.x, s.y, h, &buf);
         }
     }

@@ -46,19 +46,26 @@ pub fn animate_move(game: &mut Game, r: UnitRef, steps: &[(i32, i32, u8)]) {
 fn draw_mounted(game: &mut Game, r: UnitRef, mount: Option<Image>) {
     super::draw_ground_shadow(game, r);
     let page = game.scr.cur;
-    let (x, y, dx, flags) = {
-        let u = game.battle.unit(r);
-        (u.x, u.y, u.remap as i32, u.flags)
-    };
+    let (x, y, dx, flags, shift) = placement(game, r);
     let Some(mv) = game.battle.view.map.as_ref() else { return };
     if let Some(m) = mount {
         let lift = if flags & super::super::unit::flag::MOVE5 == 0 { 4 } else { 3 };
         let (px, py) = unit_screen_pos(mv, x, y, &m, lift, dx);
-        game.scr.pages[page].blit(&m, px as isize, py as isize);
+        game.scr.pages[page].blit(&m, (px + shift.0) as isize, (py + shift.1) as isize);
     }
     if let Some(s) = game.battle.view.units[r.side.index()].get(r.idx).and_then(|g| g.sprite.as_ref()) {
         let (px, py) = unit_screen_pos(mv, x, y, s, 4, dx);
-        game.scr.pages[page].blit(s, px as isize, py as isize);
+        game.scr.pages[page].blit(s, (px + shift.0) as isize, (py + shift.1) as isize);
+    }
+}
+
+/// Cell, frame offset and flags of a unit, and the smooth-motion shift it
+/// is drawn with (its cell then being the nudge's).
+fn placement(game: &Game, r: UnitRef) -> (i32, i32, i32, u32, (i32, i32)) {
+    let u = game.battle.unit(r);
+    match super::smooth::nudge_of(game, r) {
+        Some(n) => (n.cell.0, n.cell.1, u.remap as i32, u.flags, n.shift),
+        None => (u.x, u.y, u.remap as i32, u.flags, (0, 0)),
     }
 }
 
@@ -93,15 +100,12 @@ pub fn draw_sword_rider(game: &mut Game, r: UnitRef) {
 /// sprite lifted `lift` rows, as flyers are drawn while they move.
 pub fn draw_lifted(game: &mut Game, r: UnitRef, lift: i32) {
     let page = game.scr.cur;
-    let (x, y, dx) = {
-        let u = game.battle.unit(r);
-        (u.x, u.y, u.remap as i32)
-    };
+    let (x, y, dx, _, shift) = placement(game, r);
     if let (Some(mv), Some(s)) =
         (game.battle.view.map.as_ref(), game.battle.view.units[r.side.index()].get(r.idx).and_then(|g| g.sprite.as_ref()))
     {
         let (px, py) = unit_screen_pos(mv, x, y, s, lift, dx);
-        game.scr.pages[page].blit(s, px as isize, py as isize);
+        game.scr.pages[page].blit(s, (px + shift.0) as isize, (py + shift.1) as isize);
     }
 }
 
@@ -160,12 +164,14 @@ pub fn animate_fly(game: &mut Game, r: UnitRef, steps: &[(i32, i32, u8)]) {
     let hidden = game.battle.army(r.side).side == Side::Enemy && game.battle.is_hidden(r.side, &u);
     let mut slot = 0usize;
     for &(x, y, dir) in steps {
+        let from = super::smooth::From::now(game, Some(r));
         {
             let u = game.battle.unit_mut(r);
             u.x = x;
             u.y = y;
         }
         game.scr.set_page(0);
+        let pre = super::smooth::Snapshot::take(game);
         if !hidden {
             game.battle.map_mut().center_on(x, y, true);
             draw_window(game);
@@ -194,6 +200,19 @@ pub fn animate_fly(game: &mut Game, r: UnitRef, steps: &[(i32, i32, u8)]) {
             }
         }
         let t0 = game.battle.unit(r).anim_timer;
+        if !hidden {
+            // The frame as drawn above, for the in-between positions.
+            let start = super::smooth::step_start(game, t0, 0xc);
+            super::smooth::tween(game, from, &pre, start, 120, &mut |game| {
+                draw_window(game);
+                super::draw_ground_shadow(game, r);
+                match mt {
+                    4 => draw_flyer(game, r, true),
+                    5 => draw_sword_rider(game, r),
+                    _ => draw_lifted(game, r, 4),
+                }
+            });
+        }
         game.wait_until(t0, 0xc);
         gfx::present(game);
         game.battle.unit_mut(r).anim_timer = game.ticks();

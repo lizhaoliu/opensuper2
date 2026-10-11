@@ -13,7 +13,7 @@
 //! at most 100 events wait in the queue.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
@@ -149,6 +149,11 @@ pub struct Shared {
     pub quit: AtomicBool,
     input_cv: Condvar,
     notify: Mutex<Option<Box<dyn Fn() + Send>>>,
+    /// Smooth motion (not the original): in-between frames for walking,
+    /// flying and camera scrolls. Set by the frontend, read by the game.
+    pub smooth: AtomicBool,
+    /// Display refresh rate in mHz (0 = unknown), which paces those frames.
+    pub refresh_mhz: AtomicU32,
 }
 
 impl Shared {
@@ -159,6 +164,8 @@ impl Shared {
             quit: AtomicBool::new(false),
             input_cv: Condvar::new(),
             notify: Mutex::new(None),
+            smooth: AtomicBool::new(false),
+            refresh_mhz: AtomicU32::new(0),
         })
     }
 
@@ -264,6 +271,13 @@ pub struct Sys {
     /// machine presented; frontends may make them quicker than 60 Hz pacing.
     /// The virtual clock of headless runs ignores both.
     pub fade_pace_ms: u32,
+    /// Pacing for the next present after a smooth-motion frame, so the
+    /// step's own frame follows its in-between frames evenly.
+    tween_pace: Option<u32>,
+    /// Headless runs with `S2_SMOOTH=1` draw smooth motion too (tests).
+    smooth_headless: bool,
+    /// In-between frames drawn by a headless run.
+    pub tweens: u64,
     queue: VecDeque<Event>,
     /// Index of the pending (mergeable) mouse-move event in `queue`.
     pending_move: Option<usize>,
@@ -286,6 +300,9 @@ impl Sys {
             audio,
             pace_ms: FRAME_MS,
             fade_pace_ms: FRAME_MS,
+            tween_pace: None,
+            smooth_headless: false,
+            tweens: 0,
             queue: VecDeque::new(),
             pending_move: None,
             key_codes: [0; 256],
@@ -301,6 +318,10 @@ impl Sys {
         let mut sys = Sys::new(shared, audio);
         sys.clock = Clock::Virtual { now: 0, last_frame: 0 };
         sys.hook = Some(hook);
+        if std::env::var_os("S2_SMOOTH").is_some() {
+            sys.smooth_headless = true;
+            sys.shared.smooth.store(true, Ordering::Relaxed);
+        }
         sys
     }
 
@@ -338,8 +359,12 @@ impl Sys {
     /// default), which is how the untimed palette fades get their duration.
     pub fn flip(&mut self) {
         self.check_quit();
+        let pace = match self.tween_pace.take() {
+            Some(ms) => ms.min(self.pace_ms),
+            None => self.pace_ms,
+        };
         if let Clock::Real { last_flip, .. } = &self.clock {
-            let next = *last_flip + Duration::from_millis(self.pace_ms as u64);
+            let next = *last_flip + Duration::from_millis(pace as u64);
             let now = Instant::now();
             if next > now {
                 std::thread::sleep(next - now);
@@ -380,7 +405,7 @@ impl Sys {
             *now = frame_at;
             *last_frame = frame_at;
             self.serial += 1;
-        self.audio.frame = self.serial;
+            self.audio.frame = self.serial;
             self.notify_and_hook(false);
             self.check_quit();
         }
@@ -416,6 +441,50 @@ impl Sys {
     pub fn sleep(&mut self, ms: u32) {
         let t = self.ticks();
         self.wait_since(t, ms);
+    }
+
+    /// Headless smooth-motion runs: an in-between frame takes no virtual
+    /// time, is not counted and does not change what is shown, so the run
+    /// keeps the timeline it has without them; `S2_TWEEN_DIR` collects them.
+    pub fn tween_shot(&mut self, pixels: &[u8], palette: &Palette) {
+        self.tweens += 1;
+        if let Some(dir) = std::env::var_os("S2_TWEEN_DIR") {
+            let path = std::path::Path::new(&dir).join(format!("{:06}_{:03}.png", self.serial, self.tweens % 1000));
+            let _ = crate::qa::save_png(&path, pixels, palette);
+        }
+    }
+
+    /// Headless tests: draw smooth motion (as `S2_SMOOTH=1` does).
+    pub fn set_smooth_headless(&mut self, on: bool) {
+        self.smooth_headless = on;
+        self.shared.smooth.store(on, Ordering::Relaxed);
+    }
+
+    /// Virtual clock (headless runs).
+    pub fn is_virtual(&self) -> bool {
+        matches!(self.clock, Clock::Virtual { .. })
+    }
+
+    /// Smooth motion on (frontend option; headless runs keep it off).
+    pub fn smooth(&self) -> bool {
+        (matches!(self.clock, Clock::Real { .. }) || self.smooth_headless) && self.shared.smooth.load(Ordering::Relaxed)
+    }
+
+    /// Spacing of smooth-motion frames in ms: one display refresh (60 Hz
+    /// when unknown), at least 4 ms.
+    pub fn smooth_frame_ms(&self) -> u32 {
+        match self.shared.refresh_mhz.load(Ordering::Relaxed) {
+            0 => FRAME_MS,
+            mhz => (1_000_000 / mhz).clamp(4, FRAME_MS),
+        }
+    }
+
+    /// Present `fb` paced to `ms` since the last present instead of
+    /// `pace_ms` (smooth-motion frames).
+    pub fn flip_paced(&mut self, ms: u32) {
+        self.tween_pace = Some(ms);
+        self.flip();
+        self.tween_pace = Some(ms);
     }
 
     /// Pointer position in game coordinates (`GetCursorPos` + `ScreenToClient`).

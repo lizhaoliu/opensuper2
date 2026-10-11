@@ -107,6 +107,22 @@ pub fn present_page(game: &mut Game, p: usize) {
     game.sys.flip();
 }
 
+/// Present the current page paced to `ms` (smooth-motion frames, which
+/// are not the original's and are presented at the display's rate).
+pub fn present_paced(game: &mut Game, ms: u32) {
+    if game.sys.is_virtual() {
+        // Headless: the frame only goes to `S2_TWEEN_DIR`; what is shown stays.
+        let page = &game.scr.pages[game.scr.cur].pixels;
+        game.sys.tween_shot(page, &Palette(game.scr.hw));
+        return;
+    }
+    let scr = &mut game.scr;
+    scr.shown.pixels.copy_from_slice(&scr.pages[scr.cur].pixels);
+    game.sys.fb.pixels.copy_from_slice(&scr.shown.pixels);
+    game.sys.palette = Palette(scr.hw);
+    game.sys.flip_paced(ms);
+}
+
 /// Re-present the last frame after a palette change (`FUN_00473144`).
 fn present_palette(game: &mut Game) {
     present_trace(game, "palette");

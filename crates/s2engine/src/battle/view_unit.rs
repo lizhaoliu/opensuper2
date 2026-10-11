@@ -635,21 +635,42 @@ pub fn cut_by_units(
     dx: i32,
     except: Option<(i32, i32)>,
 ) {
+    cut_by_units_at(map, army, army_side, g, col, row, img, mode, p5, dx, except, (0, 0));
+}
+
+/// [`cut_by_units`] for an image drawn `shift` pixels away from its cell
+/// (smooth motion, not in the original).
+#[allow(clippy::too_many_arguments)]
+pub fn cut_by_units_at(
+    map: &MapView,
+    army: &[Placed],
+    army_side: i32,
+    g: &DrawGlobals,
+    col: i32,
+    row: i32,
+    img: &mut Image,
+    mode: i32,
+    p5: i32,
+    dx: i32,
+    except: Option<(i32, i32)>,
+    shift: (i32, i32),
+) {
+    let wide = dx + shift.0;
     let (lo, hi) = match except {
         Some(_) => (col - 2, col + 2),
-        None if dx == 0 => (col - 2, col + 2),
-        None if dx < 0 => (col - 3, col + 2),
+        None if wide == 0 => (col - 2, col + 2),
+        None if wide < 0 => (col - 3, col + 2),
         None => (col - 2, col + 3),
     };
     let h0 = map.height_at(col, row);
     let my_x = {
-        let mut x = (col * 64 + 0x20) - (img.width as i32 >> 1) + if except.is_some() { 0 } else { dx };
+        let mut x = (col * 64 + 0x20) - (img.width as i32 >> 1) + if except.is_some() { 0 } else { dx } + shift.0;
         if row & 1 != 0 {
             x += 0x20;
         }
         x
     };
-    let my_y = (row * 16 + 0x20) - img.height as i32;
+    let my_y = (row * 16 + 0x20) - img.height as i32 + shift.1;
     for p in army {
         let o = p.look;
         let Some(s) = p.sprite else { continue };
@@ -716,12 +737,24 @@ impl UnitScene<'_> {
     }
 
     /// FUN_00426417 (with the given cut mode) + FUN_0044055b for both armies.
-    pub fn cut_all(&self, mut buf: Image, look: &UnitLook, mode: CutMode, skip_overlay: Option<&dyn Fn(i32, i32) -> bool>) -> Image {
+    pub fn cut_all(&self, buf: Image, look: &UnitLook, mode: CutMode, skip_overlay: Option<&dyn Fn(i32, i32) -> bool>) -> Image {
+        self.cut_all_at(buf, look, mode, skip_overlay, (0, 0))
+    }
+
+    /// [`Self::cut_all`] for an image drawn `shift` pixels from its cell.
+    pub fn cut_all_at(
+        &self,
+        mut buf: Image,
+        look: &UnitLook,
+        mode: CutMode,
+        skip_overlay: Option<&dyn Fn(i32, i32) -> bool>,
+        shift: (i32, i32),
+    ) -> Image {
         let r = self.map.renderer(self.tiles, self.shading);
-        let occ = Occlusion { dx: look.remap as i32, mode, own_overlay: false, skip_overlay };
+        let occ = Occlusion { dx: look.remap as i32, mode, own_overlay: false, skip_overlay, shift };
         r.occlude(&mut buf, look.x, look.y, occ);
         for side in 0..2 {
-            cut_by_units(self.map, self.armies[side], side as i32, &self.g, look.x, look.y, &mut buf, 1, 0, look.remap as i32, None);
+            cut_by_units_at(self.map, self.armies[side], side as i32, &self.g, look.x, look.y, &mut buf, 1, 0, look.remap as i32, None, shift);
         }
         buf
     }
@@ -742,6 +775,21 @@ impl UnitScene<'_> {
         let water = is_water(self.map, self.tiles, look.x, look.y);
         add_shadow(look, &mut buf, under, water, &self.art);
         self.cut_all(buf, look, CutMode::Solid, None)
+    }
+
+    /// Smooth motion (not in the original): [`Self::draw_on_screen`] with the
+    /// unit `shift` pixels from its cell (`look`'s), its shadow over what lies
+    /// there on `surface` and the scenery cut where it is drawn.
+    pub fn draw_shifted(&self, page: &mut Image, look: &mut UnitLook, sprite: &Image, surface: &Image, shift: (i32, i32)) {
+        if !look.on_map() {
+            return;
+        }
+        let (x0, y0) = frame_origin(self.map, look.x, look.y, sprite.width, sprite.height);
+        let under = grab(surface, x0 + shift.0, y0 + shift.1, sprite.width, sprite.height);
+        let buf = self.prepared(look, sprite, &under);
+        let buf = self.cut_all_at(buf, look, self.g.cut_mode(), None, shift);
+        let (x, y) = unit_screen_pos(self.map, look.x, look.y, &buf, 0, look.remap as i32);
+        page.blit(&buf, (x + shift.0) as isize, (y + shift.1) as isize);
     }
 
     /// Port of FUN_0043ff88: draw a unit onto a screen page.

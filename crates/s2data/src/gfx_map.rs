@@ -523,11 +523,16 @@ pub struct Occlusion<'f> {
     /// When set, overlays on cells for which this returns true do not cut
     /// (param 5 together with `FUN_00402213`).
     pub skip_overlay: Option<&'f dyn Fn(i32, i32) -> bool>,
+    /// The image drawn this many pixels away from its cell (smooth motion,
+    /// not in the original): the scenery is cut where it lies relative to
+    /// the displaced image; which scenery is in front is still decided by
+    /// the cell.
+    pub shift: (i32, i32),
 }
 
 impl Default for Occlusion<'_> {
     fn default() -> Self {
-        Occlusion { dx: 0, mode: CutMode::Solid, own_overlay: false, skip_overlay: None }
+        Occlusion { dx: 0, mode: CutMode::Solid, own_overlay: false, skip_overlay: None, shift: (0, 0) }
     }
 }
 
@@ -665,7 +670,7 @@ impl<'a> MapRenderer<'a> {
     pub fn occlude(&self, img: &mut Image, col: i32, row: i32, occ: Occlusion<'_>) {
         if occ.own_overlay {
             if let Some(ov) = self.map.cell(col, row).and_then(|c| self.tiles.overlay_tile(c.overlay as i32)) {
-                cut(img, &ov, occ.dx, img.height as i32 - 1 - 0x60, occ.mode, true);
+                cut(img, &ov, occ.dx - occ.shift.0, img.height as i32 - 1 - 0x60 - occ.shift.1, occ.mode, true);
             }
         }
         let h0 = self.map.height_at(col, row) as i32;
@@ -683,11 +688,13 @@ impl<'a> MapRenderer<'a> {
     /// `FUN_0042a30c`: cells `k+1` steps in front.
     fn occlude_ring(&self, img: &mut Image, col: i32, row: i32, h0: i32, k: i32, occ: Occlusion<'_>) {
         let half = img.width as i32 >> 1;
-        let mut ox = col * TILE_W + 32 - half + occ.dx;
+        let mut ox = col * TILE_W + 32 - half + occ.dx + occ.shift.0;
         if row & 1 != 0 {
             ox += 32;
         }
-        let oy = row * ROW_H + 32 - img.height as i32;
+        let oy = row * ROW_H + 32 - img.height as i32 + occ.shift.1;
+        // Columns either side are looked at as for a frame offset by dx.
+        let dx = occ.dx + occ.shift.0;
         let kk = k + 1;
         let r2 = row + 2 * kk;
         let r1 = row - 1 + 2 * kk;
@@ -696,12 +703,12 @@ impl<'a> MapRenderer<'a> {
         a(col, r2);
         a(if even1 { col } else { col - 1 }, r1);
         a(if even1 { col + 1 } else { col }, r1);
-        if (half > 32 || occ.dx != 0) && kk != 12 {
+        if (half > 32 || dx != 0) && kk != 12 {
             a(col - 1, r2);
             a(col + 1, r2);
-            if occ.dx < 0 {
+            if dx < 0 {
                 a(if even1 { col - 1 } else { col - 2 }, r1);
-            } else if occ.dx > 0 {
+            } else if dx > 0 {
                 a(if even1 { col + 2 } else { col + 1 }, r1);
             }
         }
@@ -752,11 +759,11 @@ impl<'a> MapRenderer<'a> {
             return;
         }
         let (w, h) = (img.width as i32, img.height as i32);
-        let mut ox = col * TILE_W + 32 - (w >> 1) + occ.dx;
+        let mut ox = col * TILE_W + 32 - (w >> 1) + occ.dx + occ.shift.0;
         if row & 1 != 0 {
             ox += 32;
         }
-        let oy = row * ROW_H + 32 - h - (h0 - 1) * ROW_H;
+        let oy = row * ROW_H + 32 - h - (h0 - 1) * ROW_H + occ.shift.1;
         for o in &self.map.objects {
             let front = self.tiles.attrs.object_front_rows(o.image as i32);
             let in_front = front == 0 || row < o.row as i32 + cdiv(o.height as i32, 16) - front;

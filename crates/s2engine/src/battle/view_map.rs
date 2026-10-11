@@ -15,7 +15,6 @@ use s2data::gfx_map::{BattleMap as MapDef, MapRenderer, MapTiles, RenderOptions,
 use s2data::sprite::Image;
 use s2data::Archives;
 
-use crate::sys::{SCREEN_H, SCREEN_W};
 
 /// Scroll codes of `FUN_00426fdb` (the key/edge-scroll codes of the player phase).
 pub mod scroll {
@@ -163,20 +162,23 @@ impl MapView {
         self.blit_window_offset(dst, 0, 0);
     }
 
-    /// Port of FUN_00424cec: the window shifted by (dx, dy) pixels.
+    /// Port of FUN_00424cec: the window shifted by (dx, dy) pixels. (A
+    /// `dst` larger than the screen, the smooth-motion canvas, gets as much
+    /// more of the surface.)
     pub fn blit_window_offset(&self, dst: &mut Image, dx: i32, dy: i32) {
         let sx = self.scroll_x * 32 + dx;
         let sy = self.scroll_y * 16 + dy;
         let (sw, sh) = (self.surface.width as i32, self.surface.height as i32);
-        for y in 0..SCREEN_H as i32 {
-            let row = &mut dst.pixels[y as usize * SCREEN_W..(y as usize + 1) * SCREEN_W];
+        let (dw, dh) = (dst.width, dst.height);
+        for y in 0..dh as i32 {
+            let row = &mut dst.pixels[y as usize * dw..(y as usize + 1) * dw];
             let src_y = sy + y;
             if src_y < 0 || src_y >= sh {
                 row.fill(0);
                 continue;
             }
             let x0 = sx.max(0);
-            let x1 = (sx + SCREEN_W as i32).min(sw);
+            let x1 = (sx + dw as i32).min(sw);
             row.fill(0);
             if x0 < x1 {
                 let s = &self.surface.pixels[(src_y * sw + x0) as usize..(src_y * sw + x1) as usize];

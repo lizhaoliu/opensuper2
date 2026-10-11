@@ -11,6 +11,72 @@ pub enum Scaling {
     Integer,
 }
 
+/// How the 640x480 frame is scaled to the window (`filter=`; F12 cycles).
+/// Only `Nearest` shows the frame as the original did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Filter {
+    /// Each window pixel shows the game pixel it falls in.
+    Nearest,
+    /// Nearest with one-pixel blended edges: even pixel sizes at any scale.
+    Sharp,
+    /// Edge-directed smoothing of the pixel art (xBR level 2).
+    Xbr,
+    /// Scanlines, aperture grille and glow of a CRT monitor.
+    Crt,
+}
+
+impl Filter {
+    pub const ALL: [Filter; 4] = [Filter::Nearest, Filter::Sharp, Filter::Xbr, Filter::Crt];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Filter::Nearest => "nearest",
+            Filter::Sharp => "sharp",
+            Filter::Xbr => "xbr",
+            Filter::Crt => "crt",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Filter> {
+        Filter::ALL.into_iter().find(|f| f.name() == s)
+    }
+
+    pub fn index(self) -> usize {
+        Filter::ALL.iter().position(|&f| f == self).unwrap_or(0)
+    }
+
+    pub fn next(self) -> Filter {
+        Filter::ALL[(self.index() + 1) % Filter::ALL.len()]
+    }
+
+    /// Fragment shader entry point in `present.wgsl`.
+    pub fn entry_point(self) -> &'static str {
+        match self {
+            Filter::Nearest => "fs_nearest",
+            Filter::Sharp => "fs_sharp",
+            Filter::Xbr => "fs_xbr",
+            Filter::Crt => "fs_crt",
+        }
+    }
+
+    /// Shown when the filter changes.
+    pub fn label(self) -> &'static str {
+        match self {
+            Filter::Nearest => "畫面：原始像素",
+            Filter::Sharp => "畫面：銳利縮放",
+            Filter::Xbr => "畫面：xBR 平滑",
+            Filter::Crt => "畫面：CRT 映像管",
+        }
+    }
+}
+
+/// `renderer=`: GPU presentation (filters) or the plain CPU path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Renderer {
+    Gpu,
+    Cpu,
+}
+
 #[derive(Debug, Clone)]
 pub struct FrontConfig {
     pub fullscreen: bool,
@@ -26,13 +92,29 @@ pub struct FrontConfig {
     pub ai: s2engine::game::AiMode,
     /// `enemy_boost=0..100`: extra % on enemy stats (not the original).
     pub enemy_boost: u8,
+    pub filter: Filter,
+    pub renderer: Renderer,
+    /// `smooth=0|1`: in-between frames for walking, flying and camera
+    /// scrolls (not the original; F9 toggles).
+    pub smooth: bool,
     path: PathBuf,
 }
 
 impl FrontConfig {
     pub fn load(game_dir: &Path) -> FrontConfig {
         let path = game_dir.join("opensuper2.ini");
-        let mut c = FrontConfig { fullscreen: false, window: None, scaling: Scaling::Fit, fade_speed: 1, ai: Default::default(), enemy_boost: 0, path };
+        let mut c = FrontConfig {
+            fullscreen: false,
+            window: None,
+            scaling: Scaling::Fit,
+            fade_speed: 1,
+            ai: Default::default(),
+            enemy_boost: 0,
+            filter: Filter::Nearest,
+            renderer: Renderer::Gpu,
+            smooth: false,
+            path,
+        };
         let Ok(text) = std::fs::read_to_string(&c.path) else { return c };
         for line in text.lines() {
             let Some((k, v)) = line.split_once('=') else { continue };
@@ -49,6 +131,9 @@ impl FrontConfig {
                 "fade_speed" => c.fade_speed = v.parse::<u32>().unwrap_or(1).clamp(1, 16),
                 "ai" => c.ai = s2engine::game::AiMode::parse(v).unwrap_or_default(),
                 "enemy_boost" => c.enemy_boost = v.parse::<u8>().unwrap_or(0).min(100),
+                "filter" => c.filter = Filter::parse(v).unwrap_or(Filter::Nearest),
+                "renderer" => c.renderer = if v == "cpu" { Renderer::Cpu } else { Renderer::Gpu },
+                "smooth" => c.smooth = v == "1",
                 _ => {}
             }
         }
@@ -61,6 +146,10 @@ impl FrontConfig {
             Scaling::Integer => "integer",
         }, self.fade_speed);
         s += &format!("ai={}\nenemy_boost={}\n", self.ai.name(), self.enemy_boost);
+        s += &format!("filter={}\nsmooth={}\n", self.filter.name(), self.smooth as u8);
+        if self.renderer == Renderer::Cpu {
+            s += "renderer=cpu\n";
+        }
         if let Some((w, h)) = self.window {
             s += &format!("window={w},{h}\n");
         }

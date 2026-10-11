@@ -117,6 +117,8 @@ pub mod motion;
 pub mod overlay;
 #[path = "view_panel.rs"]
 pub mod panel;
+#[path = "view_smooth.rs"]
+pub mod smooth;
 #[path = "view_surface.rs"]
 pub mod surface;
 #[path = "view_unit.rs"]
@@ -208,6 +210,8 @@ pub struct BattleView {
     pub panel_pos: i32,
     /// `DAT_0049fe00`: frame of a flyer's mount (sysimg 23/24).
     pub mount_phase: usize,
+    /// Smooth motion: the unit drawn between two cells (not the original).
+    pub nudge: Option<smooth::Nudge>,
     /// The map surface is to be rebuilt from the background (after a new
     /// map or background, or a load).
     fresh: bool,
@@ -744,6 +748,7 @@ fn draw_scene(game: &mut Game, lifted: bool, with_cursor: bool, with_range: bool
     let pl = placed(&lk, &v.units);
     let scene = UnitScene { map: mv, tiles: &assets.tiles, shading: &assets.shading, art: assets.unit_art(), g, armies: [&pl[0], &pl[1]] };
     let mut updates = Vec::new();
+    let nudge = v.nudge;
     // Units lifted off the surface, back to front (FUN_0044ecf8 sorts the
     // same way when several animate together).
     // A lifted unit the battle code drew into the surface itself is shown
@@ -757,8 +762,16 @@ fn draw_scene(game: &mut Game, lifted: bool, with_cursor: bool, with_range: bool
         let gx = &v.units[s][i];
         if let Some(sprite) = gx.sprite.as_ref() {
             let mut l2 = lk[s][i];
-            let under = under_of(mv, gx, &l2, sprite);
-            scene.draw_on_screen(dst, &mut l2, sprite, &under, 0);
+            match nudge.filter(|n| (n.unit.side.index(), n.unit.idx) == (s, i)) {
+                Some(n) => {
+                    (l2.x, l2.y) = n.cell;
+                    scene.draw_shifted(dst, &mut l2, sprite, &mv.surface, n.shift);
+                }
+                None => {
+                    let under = under_of(mv, gx, &l2, sprite);
+                    scene.draw_on_screen(dst, &mut l2, sprite, &under, 0);
+                }
+            }
             updates.push((s, i, l2.render_flags));
         }
     }
@@ -887,21 +900,29 @@ pub fn draw_ground_shadow_with(game: &mut Game, r: UnitRef, own_overlay: bool) {
     let Game { battle, scr, .. } = game;
     let v = &battle.view;
     let (Some(assets), Some(mv)) = (v.assets.as_deref(), v.map.as_ref()) else { return };
-    let l = lk[r.side.index()][r.idx];
+    let mut l = lk[r.side.index()][r.idx];
+    // Smooth motion: the shadow of a unit between cells, under it.
+    let shift = match v.nudge.filter(|n| n.unit == r) {
+        Some(n) => {
+            (l.x, l.y) = n.cell;
+            n.shift
+        }
+        None => (0, 0),
+    };
     let (cx, cy) = mv.cell_screen(l.x, l.y);
-    let mut buf = unit::grab(&scr.pages[page], cx, cy, 64, 32);
+    let mut buf = unit::grab(&scr.pages[page], cx + shift.0, cy + shift.1, 64, 32);
     let ell = &assets.sysimg[slot::LIFT_SHADOW];
     for (p, &e) in buf.pixels.iter_mut().zip(ell.pixels.iter()) {
         *p = if e == 0 { 0 } else { assets.tints[5][*p as usize] };
     }
     let pl = placed(&lk, &v.units);
     for (side, army) in pl.iter().enumerate() {
-        unit::cut_by_units(mv, army, side as i32, &g, l.x, l.y, &mut buf, 1, 0, 0, None);
+        unit::cut_by_units_at(mv, army, side as i32, &g, l.x, l.y, &mut buf, 1, 0, 0, None, shift);
     }
-    let occ = s2data::gfx_map::Occlusion { own_overlay, ..Default::default() };
+    let occ = s2data::gfx_map::Occlusion { own_overlay, shift, ..Default::default() };
     mv.renderer(&assets.tiles, &assets.shading).occlude(&mut buf, l.x, l.y, occ);
     let (x, y) = unit::unit_screen_pos(mv, l.x, l.y, &buf, 0, 0);
-    scr.pages[page].blit(&buf, x as isize, y as isize);
+    scr.pages[page].blit(&buf, (x + shift.0) as isize, (y + shift.1) as isize);
 }
 
 /// Port of FUN_00425879 (with the 遮掩網點 setting choosing the variant).
@@ -1169,6 +1190,7 @@ pub fn animate_walk(game: &mut Game, r: UnitRef, steps: &[(i32, i32, u8)]) {
     let mut sound_kind = 0;
     let mut slot = 0usize;
     for &(x, y, dir) in steps {
+        let from = smooth::From::now(game, Some(r));
         {
             let u = game.battle.unit_mut(r);
             u.x = x;
@@ -1203,8 +1225,11 @@ pub fn animate_walk(game: &mut Game, r: UnitRef, steps: &[(i32, i32, u8)]) {
         // brought up to date: the walker left it before setting off).
         bake(game);
         capture(game, r);
+        let pre = smooth::Snapshot::take(game);
         draw_map(game);
         let t0 = game.battle.unit(r).anim_timer;
+        let start = smooth::step_start(game, t0, 8);
+        smooth::tween(game, from, &pre, start, 80, &mut draw_map);
         game.wait_until(t0, 8);
         gfx::present(game);
         game.battle.unit_mut(r).anim_timer = game.ticks();
@@ -2307,5 +2332,70 @@ mod tests {
                 save(&dump, &format!("stage_end_{}_{k:03}", if won { "win" } else { "lose" }), f, &pal);
             }
         }
+    }
+
+    /// Smooth motion: the same walk, flight and camera scroll with and
+    /// without in-between frames present the same frames and leave the
+    /// units the same (`S2_TWEEN_DIR=DIR` collects the in-between frames).
+    #[test]
+    fn smooth_motion_leaves_no_trace() {
+        let Some(data) = data() else {
+            eprintln!("view tests: no game data, skipped");
+            return;
+        };
+        let run = |smooth: bool| {
+            let (mut sys, frames) = setup();
+            sys.set_smooth_headless(smooth);
+            let mut game = Game::new(&mut sys, &data);
+            game.res = Some(crate::res::Res::load(&data, &game.cfg).unwrap());
+            let mut master = data.dir.read("supersp.pal").unwrap()[..0x300].to_vec();
+            master[..3].fill(0);
+            game.scr.hw = vga_to_rgb(&master);
+            game.battle.set_tables(Rc::new(RuleTables::load(&data.dir, &data.arcs).unwrap()));
+            let st = StageFile::parse(data.arcs.read(s2data::Kind::Bin, 1).unwrap()).unwrap().stage(1).unwrap();
+            game.battle.set_map(Map::load(&data.arcs, st.header.map as usize).unwrap());
+            game.battle.start_stage(&st);
+            game.battle.deploy_turn(1);
+            init(&mut game, st.header.map as usize).unwrap();
+            game.cfg.screen_speed = 5;
+            let p0 = UnitRef::new(Side::Player, 0);
+            let (mut x, mut y) = (game.battle.unit(p0).x, game.battle.unit(p0).y);
+            game.battle.map_mut().center_on(x, y, true);
+            game.scr.set_page(0);
+            draw_battle(&mut game);
+            gfx::present(&mut game);
+            let mut path = |dirs: &[usize]| {
+                dirs.iter()
+                    .map(|&d| {
+                        (x, y) = crate::battle::map::neighbour(x, y, d);
+                        (x, y, d as u8)
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let walk = path(&[3, 3, 2, 3]);
+            let flight = path(&[1, 1, 0, 0]);
+            set_anim(&mut game, p0, 1);
+            animate_walk(&mut game, p0, &walk);
+            motion::animate_fly(&mut game, p0, &flight);
+            set_anim(&mut game, p0, 0);
+            bake(&mut game);
+            crate::battle::camera::scroll_to(&mut game, 40, 60, None);
+            let units: Vec<(i32, i32, u8, u8, u32, i32)> = game.battle.armies[0]
+                .units
+                .iter()
+                .chain(&game.battle.armies[1].units)
+                .map(|u| (u.x, u.y, u.facing, u.frame, u.render_flags, u.anim_timer))
+                .collect();
+            let tweens = game.sys.tweens;
+            let f = frames.lock().unwrap().clone();
+            (f, units, tweens)
+        };
+        let (frames_a, units_a, tweens_a) = run(false);
+        let (frames_b, units_b, tweens_b) = run(true);
+        assert_eq!(tweens_a, 0);
+        assert!(tweens_b >= 4 * 8, "only {tweens_b} in-between frames");
+        assert_eq!(units_a, units_b);
+        assert_eq!(frames_a.len(), frames_b.len());
+        assert!(frames_a == frames_b, "presented frames differ");
     }
 }
