@@ -443,8 +443,8 @@ impl Battle {
             }
         }
         self.apply_all_equipment(r);
-        for k in 0..11 {
-            self.unit_mut(r).learned[k] = d.spells[k] as u16;
+        for (k, &sp) in d.spells.iter().enumerate() {
+            self.unit_mut(r).learned[k] = sp as u16;
         }
         self.learned_prof_floor(r);
         if let Some(c) = &class {

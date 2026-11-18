@@ -27,7 +27,34 @@ Optional, not part of the original (`Game::options`, opensuper2.ini, s2auto flag
 - Eval (`tools/ai_eval.sh` + `tools/ai_variety.py`, 17 stages × 5 seeds, player on 自動作戰):
   player wins original 44 %, enhanced+0 60 %, enhanced+20 17 %, enhanced+40 3 %; enemy casts
   use 27 distinct spells vs 17 and 1.6 vs 1.2 distinct spells per casting unit.
-- Off (`ai=original`, boost 0) everything is the original: check.sh 2135/2135.
+- `dynamic_difficulty=1` (`--dynamic-difficulty`; `flow/dynamic.rs`): a pressure in % (−20..+30) kept with
+  the campaign — +3 for a battle won with nobody lost, −4 per unit lost beyond the first (−12 at most), −4 per
+  defeat before the win — is the enemy army's stat bonus (with `enemy_boost`) from turn 1 of each battle stage
+  (`scale_army`, before the turn-1 save; the original's army field, so loads and reinforcements keep it). A
+  stage lost and reloaded is eased by 8 % per defeat (down to −40 %, that stage only; counted in memory).
+  State beside each save in `SAVE\UJnn.DYN` (pressure, stage, the party's death count at its start); without
+  the option no such file is written and one found beside a slot being saved is removed.
+  Why not the original's scheme (FUN_0040d729, party power against a per-stage base): all 168 stage headers
+  have base and step 0, and no base can be supplied — over natural 自動作戰 runs the party's average power
+  is 0.34 to 3.9 times the enemy's from one stage to the next (stage 73: 0.34, stage 1: 2.9, stage 83: 3.9),
+  against ±15 % between runs on one stage.
+  Check: 4 seeds x both routes on 自動作戰, 3 retries: stages played 7/11/3/7 (route 0) and 11/14/11/11
+  (route 1) without it, 12/15/11/15 and 14/14/26/11 with it; the trace (`dynamic ...`) shows the pressure
+  rise on clean wins and each reload of a lost stage eased.
+- `exp_catchup=1` (`--exp-catchup`; `Battle::exp_catchup_pct`): the player's own unit whose power rating
+  (max stats) is under the party's average earns that share more EXP, at most +75 %; applied after the
+  original's scaling in `Battle::award_exp`, so the EXP box shows it.
+- The danger zone (D in the player phase and the command menu; `ai_plus::danger_zone`, `view::Danger`): the
+  cells within reach of where each able, visible enemy can stop with a turn's AP (weapon range with the AP
+  for an attack left, damaging spell/technique range with the AP for that), drawn as a red tint
+  (`ColorTree::tint_table` toward the palette's red) over the map window and the range display in
+  `view::draw_scene`, cut by units and scenery like the range diamonds. Recomputed in the player phase's loop
+  when a hash of the units changes; no RNG, `Battle::range` restored; hidden while the computer plays.
+  Not in VS, not at difficulty 5.
+- Fast forward (`Shared::speed`): the real clock of `Sys` runs N times faster (ticks, waits and present
+  pacing alike) while the frontend holds it or, with `enemy_fast`, while `turn::auto_phase_mode` runs;
+  smooth motion pauses meanwhile. The virtual clock of headless runs is never scaled.
+- Off (`ai=original`, boost 0, the others 0, no D) everything is the original: check.sh all identical.
 
 **Open.**
 - Sweep residues in battle code (docs/qa-status.md): `camera::scroll_exact`'s unit drawing for

@@ -230,8 +230,8 @@ impl Surf<'_> {
     /// FUN_004403b5 x2, as after loading a save).
     pub fn rebuild(&mut self) {
         self.mv.surface = self.mv.bg.clone();
-        for s in 0..2 {
-            for g in self.units[s].iter_mut() {
+        for army in self.units.iter_mut() {
+            for g in army.iter_mut() {
                 g.drawn = None;
                 g.held = false;
             }

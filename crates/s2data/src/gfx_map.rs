@@ -444,38 +444,36 @@ pub enum CutMode {
 pub fn cut(dst: &mut Image, mask: &Image, x: i32, y: i32, mode: CutMode, skip_shadow: bool) {
     let (dw, dh, mw, mh) = (dst.width as i32, dst.height as i32, mask.width as i32, mask.height as i32);
     let (mut d0, mut m0) = (0i32, 0i32);
-    let rows;
-    if y < 0 {
+    let rows = if y < 0 {
         if y + mh < 0 {
             return;
         }
         m0 += mw * -y;
-        rows = (mh + y).min(dh);
+        (mh + y).min(dh)
     } else if y < 1 {
-        rows = mh.min(dh);
+        mh.min(dh)
     } else {
         if dh < y {
             return;
         }
         d0 += dw * y;
-        rows = (dh - y).min(mh);
-    }
-    let cols;
-    if x < 0 {
+        (dh - y).min(mh)
+    };
+    let cols = if x < 0 {
         if x + mw < 0 {
             return;
         }
         m0 += -x;
-        cols = (mw + x).min(dw);
+        (mw + x).min(dw)
     } else if x < 1 {
-        cols = mw.min(dw);
+        mw.min(dw)
     } else {
         if dw < x {
             return;
         }
         d0 += x;
-        cols = (dw - x).min(mw);
-    }
+        (dw - x).min(mw)
+    };
     if rows <= 0 || cols <= 0 {
         return;
     }

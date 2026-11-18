@@ -311,6 +311,38 @@ impl OverlayScene<'_> {
         RangePages { occluded: page, plain, scroll: (self.map.scroll_x, self.map.scroll_y), page: 1, pulse: 0, pulse_down: false, t_page: 0, t_pulse: 0, aim: true }
     }
 
+    /// The danger zone layer (not the original): a 640x480 mask of the
+    /// window, non-zero on the ground diamonds of the `zone` cells in view
+    /// (`row * width + col`), less what units and scenery in front cover.
+    pub fn build_mask(&self, zone: &[bool]) -> Image {
+        let mut layer = Image::new(640, 480);
+        // The top face of a cell: a 64x32 diamond.
+        let mut shape = Image::new(64, 32);
+        for y in 0..32usize {
+            let half = if y < 16 { 2 * (y + 1) } else { 2 * (32 - y) };
+            shape.pixels[y * 64 + 32 - half..y * 64 + 32 + half].fill(1);
+        }
+        let (w, h2) = (self.map.width(), self.map.rows());
+        for y in 1..h2 - 1 {
+            for x in 0..w {
+                if !zone.get((y * w + x) as usize).copied().unwrap_or(false) || (y & 1 == 0 && (x == 0 || x == w - 1)) || !self.map.cell_in_view(x, y, 0) {
+                    continue;
+                }
+                // Off-map cells (ground 0 / 1) have nothing to stand on.
+                if self.map.def.cells.get((y * w + x) as usize).is_none_or(|c| c.ground < 2 || c.height == 0) {
+                    continue;
+                }
+                let mut a = shape.clone();
+                for side in 0..2 {
+                    cut_by_units(self.map, self.armies[side], side as i32, &self.g, x, y, &mut a, 2, 1, 0, None);
+                }
+                self.map.renderer(self.tiles, self.shading).occlude(&mut a, x, y, Occlusion::default());
+                self.map.blit_at_cell(&mut layer, x, y, self.map.height_at(x, y), &a);
+            }
+        }
+        layer
+    }
+
     /// The hard-mode cell image of FUN_0047280f: the cell's own ground
     /// (and overlay) pixels inside the diamond mask.
     fn hard_cell(&self, c: i32, r: i32, mask: Option<&Image>) -> Option<Image> {

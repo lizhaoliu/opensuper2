@@ -2,7 +2,9 @@
 //! frame to it and forwards keyboard/mouse input to the game thread.
 //!
 //! Frontend keys (not seen by the game): Alt+Enter or F11 toggles fullscreen,
-//! F12 cycles the display filter, F9 toggles smooth motion.
+//! F12 cycles the display filter, F9 toggles smooth motion, F8 toggles fast
+//! forward while the computer plays and holding ` (the key left of 1) fast
+//! forwards anything.
 
 // Release builds on Windows are GUI programs: no console window.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -181,7 +183,7 @@ impl App {
         match self.presenter.as_mut() {
             Some(Presenter::Gpu(g)) => {
                 self.rgba.resize(SCREEN_W * SCREEN_H * 4, 0);
-                for (d, &c) in self.rgba.chunks_exact_mut(4).zip(self.rgb.iter()) {
+                for (d, &c) in self.rgba.as_chunks_mut::<4>().0.iter_mut().zip(self.rgb.iter()) {
                     d.copy_from_slice(&[(c >> 16) as u8, (c >> 8) as u8, c as u8, 0xff]);
                 }
                 match g.render(&self.rgba, (ww, wh), self.view, self.cfg.filter) {
@@ -258,6 +260,14 @@ impl App {
     }
 
     /// Tell the game the refresh rate of the window's display.
+    fn toggle_enemy_fast(&mut self) {
+        self.cfg.enemy_fast = !self.cfg.enemy_fast;
+        self.shared.fast_ai.store(self.cfg.enemy_fast, Ordering::Relaxed);
+        self.cfg.save();
+        let text = if self.cfg.enemy_fast { format!("敵方回合快進：開（{} 倍）", self.cfg.fast_speed) } else { "敵方回合快進：關（原版）".to_string() };
+        self.notify(&text);
+    }
+
     fn update_refresh(&self) {
         let mhz = self.window.as_ref().and_then(|w| w.current_monitor()).and_then(|m| m.refresh_rate_millihertz()).unwrap_or(0);
         self.shared.refresh_mhz.store(mhz, Ordering::Relaxed);
@@ -333,6 +343,10 @@ impl ApplicationHandler<UserEvent> for App {
     fn user_event(&mut self, el: &ActiveEventLoop, ev: UserEvent) {
         match ev {
             UserEvent::Frame => {
+                // A line from the game (e.g. the dynamic difficulty of a stage).
+                if let Some(text) = self.shared.take_notice() {
+                    self.notify(&text);
+                }
                 if let Some(w) = &self.window {
                     w.request_redraw();
                     // SetCursorPos from the game (the original warps the pointer onto menu items).
@@ -371,6 +385,7 @@ impl ApplicationHandler<UserEvent> for App {
                 // Keys held while focus leaves would otherwise stay down.
                 self.alt_down = false;
                 self.shift_down = false;
+                self.shared.fast_hold.store(false, Ordering::Relaxed);
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if let PhysicalKey::Code(code) = event.physical_key {
@@ -382,12 +397,18 @@ impl ApplicationHandler<UserEvent> for App {
                     }
                     let fullscreen = code == KeyCode::F11
                         || (self.alt_down && matches!(code, KeyCode::Enter | KeyCode::NumpadEnter));
-                    let shortcut = fullscreen || matches!(code, KeyCode::F12 | KeyCode::F9);
+                    if code == KeyCode::Backquote {
+                        // Held: fast forward. The game never sees the key.
+                        self.shared.fast_hold.store(event.state == ElementState::Pressed, Ordering::Relaxed);
+                        return;
+                    }
+                    let shortcut = fullscreen || matches!(code, KeyCode::F12 | KeyCode::F9 | KeyCode::F8);
                     if event.state == ElementState::Pressed && shortcut {
                         if !event.repeat {
                             match code {
                                 KeyCode::F12 => self.cycle_filter(),
                                 KeyCode::F9 => self.toggle_smooth(),
+                                KeyCode::F8 => self.toggle_enemy_fast(),
                                 _ => self.toggle_fullscreen(),
                             }
                         }
@@ -558,10 +579,23 @@ fn run() -> Result<()> {
         log!("not the original: filter={} smooth={} (opensuper2.ini)", cfg.filter.name(), cfg.smooth as u8);
     }
     let toasts = toast::Painter::new(&data.arcs);
-    let options = s2engine::game::Options { ai: cfg.ai, enemy_boost: cfg.enemy_boost };
+    let options = s2engine::game::Options {
+        ai: cfg.ai,
+        enemy_boost: cfg.enemy_boost,
+        dynamic_difficulty: cfg.dynamic_difficulty,
+        exp_catchup: cfg.exp_catchup,
+    };
     if options != s2engine::game::Options::default() {
-        log!("not the original: enemy ai={} enemy_boost={}% (opensuper2.ini)", options.ai.name(), options.enemy_boost);
+        log!(
+            "not the original: enemy ai={} enemy_boost={}% dynamic_difficulty={} exp_catchup={} (opensuper2.ini)",
+            options.ai.name(),
+            options.enemy_boost,
+            options.dynamic_difficulty as u8,
+            options.exp_catchup as u8
+        );
     }
+    shared.fast_ai.store(cfg.enemy_fast, Ordering::Relaxed);
+    shared.fast_speed.store(cfg.fast_speed, Ordering::Relaxed);
     let game = spawn_game(shared.clone(), audio, move |sys| {
         sys.fade_pace_ms = fade_pace_ms;
         let r = s2engine::run_with_options(sys, &data, options);

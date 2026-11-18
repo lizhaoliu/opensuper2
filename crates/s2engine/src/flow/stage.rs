@@ -294,6 +294,9 @@ pub fn stage_loop(game: &mut Game, c: i32) -> Result<i32> {
     // From here the battle loop of FUN_0040d108; the phases are the BATTLE API
     // (`crate::battle::{turn, menu}`).
     battle::turn::adapt_difficulty(game);
+    if c == code::LOADED || c == code::LOADED_SLOT50 {
+        super::dynamic::battle_loaded(game);
+    }
     let fame = game.battle.recalc_army_flags(Side::Player, 1);
     battle::turn::pay_fame(game, fame);
     game.campaign.location = game.campaign.stage;
@@ -308,9 +311,11 @@ pub fn stage_loop(game: &mut Game, c: i32) -> Result<i32> {
         if !game.campaign.vs_mode {
             if c == code::FROM_WORLD_MAP {
                 game.campaign.music = game.stage.as_ref().map(|s| s.stage.header.music).unwrap_or(0);
+                super::dynamic::stage_start(game);
                 autosave_turn1(game)?;
             } else if c != code::LOADED && c != code::LOADED_SLOT50 {
                 deploy_turn_units(game);
+                super::dynamic::stage_start(game);
                 autosave_turn1(game)?;
             }
         } else {
@@ -433,6 +438,7 @@ pub fn stage_loop(game: &mut Game, c: i32) -> Result<i32> {
     if r == code::LOADED || r == code::LOADED_SLOT50 {
         return Ok(r);
     }
+    super::dynamic::stage_result(game, r);
     if r == code::LOSE {
         // FUN_0041a765: the defeat effect (FUN_0046c8cb), then the music stops.
         view::motion::stage_end(game, false);

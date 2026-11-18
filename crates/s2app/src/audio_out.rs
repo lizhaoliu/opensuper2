@@ -62,7 +62,7 @@ impl SynthState {
             self.synth.render(l, r);
             done += n;
         }
-        for (i, f) in out.chunks_exact_mut(2).enumerate() {
+        for (i, f) in out.as_chunks_mut::<2>().0.iter_mut().enumerate() {
             f[0] += self.left[i];
             f[1] += self.right[i];
         }

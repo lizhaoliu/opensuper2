@@ -241,7 +241,7 @@ impl StageFile {
                 2 => Reward::Leave(v),
                 3 => Reward::Gold(v.first().copied().unwrap_or(0)),
                 4 => Reward::Items(v),
-                5 => Reward::Treasure(v.chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect()),
+                5 => Reward::Treasure(v.as_chunks::<4>().0.iter().map(|c| [c[0], c[1], c[2], c[3]]).collect()),
                 k => Reward::Other(k, v),
             });
         }

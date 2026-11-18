@@ -534,8 +534,8 @@ impl GrowthTable {
             let r = Rec::at(b, 2 + c * 108, 108, W)?;
             let mut g = [GrowthDesc::default(); 9];
             for (s, d) in g.iter_mut().enumerate() {
-                for k in 0..6 {
-                    d.0[k] = r.i16(s * 12 + k * 2)?;
+                for (k, v) in d.0.iter_mut().enumerate() {
+                    *v = r.i16(s * 12 + k * 2)?;
                 }
             }
             growth.push(g);

@@ -14,6 +14,9 @@ use super::movement::facing_toward;
 use super::unit::{buff, flag, status, Unit};
 use super::Battle;
 
+/// `exp_catchup=1`: the most extra EXP in % a unit behind the party earns.
+pub const EXP_CATCHUP_MAX: i32 = 75;
+
 /// A unit in an attack's range (`TargetList+0x3c`, 16 bytes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Target {
@@ -524,12 +527,39 @@ impl Battle {
         }
     }
 
+    /// `exp_catchup=1` (not the original): the extra EXP in % for `r`, one
+    /// of the player's own units whose power rating (強度, at full health)
+    /// is below the average of the party — the same share as it is short
+    /// of that average, at most [`EXP_CATCHUP_MAX`]. NPC allies, summons
+    /// and the other army get none.
+    pub fn exp_catchup_pct(&self, r: UnitRef) -> i32 {
+        let own = |u: &Unit| u.npc != 1 && u.flags & (flag::SUMMON | flag::RESERVE) == 0;
+        if r.side != Side::Player || !own(self.unit(r)) {
+            return 0;
+        }
+        let (mut sum, mut n) = (0i64, 0i64);
+        for u in self.army(Side::Player).units.iter().filter(|u| own(u)) {
+            sum += self.power_quiet(u, 2) as i64;
+            n += 1;
+        }
+        if n < 2 || sum <= 0 {
+            return 0;
+        }
+        let avg = sum / n;
+        let mine = self.power_quiet(self.unit(r), 2) as i64;
+        (((avg - mine) * 100 / avg.max(1)) as i32).clamp(0, EXP_CATCHUP_MAX)
+    }
+
     /// Port of FUN_00452e38 (state part): award EXP and items to `r`
     /// (scaling via `rules::award_exp`). Returns the EXP added.
     pub fn award_exp(&mut self, r: UnitRef, exp: i32, items: &[u8]) -> i32 {
         let t = self.t();
         let ctx = rules::Ctx::new(&t, self.difficulty, self.vs);
-        let e = rules::award_exp(&ctx, exp, self.unit(r).abilities, rules_side(self.army(r.side).side));
+        let mut e = rules::award_exp(&ctx, exp, self.unit(r).abilities, rules_side(self.army(r.side).side));
+        if e != 0 && self.exp_catchup {
+            // Not the original (`exp_catchup=1`).
+            e = (e + e * self.exp_catchup_pct(r) / 100).min(999);
+        }
         if e != 0 {
             let u = self.unit_mut(r);
             let v = u.exp as i32 + e;

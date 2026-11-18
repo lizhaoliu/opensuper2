@@ -44,6 +44,7 @@ pub mod deploy;
 pub mod dialogue;
 pub mod ending;
 pub mod difficulty;
+pub mod dynamic;
 pub mod init;
 pub mod march;
 pub mod movie;

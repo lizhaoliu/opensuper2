@@ -154,6 +154,16 @@ pub struct Shared {
     pub smooth: AtomicBool,
     /// Display refresh rate in mHz (0 = unknown), which paces those frames.
     pub refresh_mhz: AtomicU32,
+    /// Fast forward (not the original): the game's clock runs `fast_speed`
+    /// times faster while `fast_hold` is set (a key held in the frontend)
+    /// or, with `fast_ai`, while the computer plays a phase (`ai_phase`,
+    /// set by the game).
+    pub fast_hold: AtomicBool,
+    pub fast_ai: AtomicBool,
+    pub ai_phase: AtomicBool,
+    pub fast_speed: AtomicU32,
+    /// A line for the frontend to show briefly (not the original).
+    notice: Mutex<Option<String>>,
 }
 
 impl Shared {
@@ -166,7 +176,31 @@ impl Shared {
             notify: Mutex::new(None),
             smooth: AtomicBool::new(false),
             refresh_mhz: AtomicU32::new(0),
+            fast_hold: AtomicBool::new(false),
+            fast_ai: AtomicBool::new(false),
+            ai_phase: AtomicBool::new(false),
+            fast_speed: AtomicU32::new(4),
+            notice: Mutex::new(None),
         })
+    }
+
+    /// Ask the frontend to show `text` for a moment (the last one wins).
+    pub fn post_notice(&self, text: &str) {
+        *self.notice.lock().unwrap() = Some(text.to_string());
+    }
+
+    pub fn take_notice(&self) -> Option<String> {
+        self.notice.lock().unwrap().take()
+    }
+
+    /// How many times faster than real time the game's clock should run.
+    pub fn speed(&self) -> u32 {
+        let fast = self.fast_hold.load(Ordering::Relaxed) || (self.fast_ai.load(Ordering::Relaxed) && self.ai_phase.load(Ordering::Relaxed));
+        if fast {
+            self.fast_speed.load(Ordering::Relaxed).clamp(1, 16)
+        } else {
+            1
+        }
     }
 
     /// Called by the frontend whenever a new frame is ready (e.g. request a redraw).
@@ -250,7 +284,10 @@ const FRAME_MS: u32 = 16;
 const MAX_EVENTS: usize = 100;
 
 enum Clock {
-    Real { start: Instant, last_flip: Instant },
+    /// Real time, `speed` times faster since `mark` (when the game's clock
+    /// read `base_ms`): fast forward (`Shared::speed`, not the original)
+    /// changes the speed, never the reading.
+    Real { mark: Instant, base_ms: u64, speed: u32, last_flip: Instant },
     /// Deterministic time; advances when the game presents, waits or polls an empty queue.
     Virtual { now: u32, last_frame: u32 },
 }
@@ -294,7 +331,7 @@ impl Sys {
             fb: Image::new(SCREEN_W, SCREEN_H),
             palette: Palette([[0; 3]; 256]),
             shared,
-            clock: Clock::Real { start: now, last_flip: now },
+            clock: Clock::Real { mark: now, base_ms: 0, speed: 1, last_flip: now },
             serial: 0,
             hook: None,
             audio,
@@ -332,9 +369,23 @@ impl Sys {
     /// Milliseconds since start.
     pub fn ticks(&self) -> u32 {
         match &self.clock {
-            Clock::Real { start, .. } => start.elapsed().as_millis() as u32,
+            Clock::Real { mark, base_ms, speed, .. } => (*base_ms + mark.elapsed().as_millis() as u64 * *speed as u64) as u32,
             Clock::Virtual { now, .. } => *now,
         }
+    }
+
+    /// Follow the fast-forward speed the frontend asks for; returns it (1
+    /// on the virtual clock).
+    fn sync_speed(&mut self) -> u32 {
+        let want = self.shared.speed();
+        let Clock::Real { mark, base_ms, speed, .. } = &mut self.clock else { return 1 };
+        if *speed != want {
+            let now = Instant::now();
+            *base_ms += (now - *mark).as_millis() as u64 * *speed as u64;
+            *mark = now;
+            *speed = want;
+        }
+        want
     }
 
     /// The original clock in centiseconds (`FUN_0046d5d6`; the original
@@ -363,8 +414,9 @@ impl Sys {
             Some(ms) => ms.min(self.pace_ms),
             None => self.pace_ms,
         };
+        let speed = self.sync_speed();
         if let Clock::Real { last_flip, .. } = &self.clock {
-            let next = *last_flip + Duration::from_millis(pace as u64);
+            let next = *last_flip + Duration::from_micros(pace as u64 * 1000 / speed as u64);
             let now = Instant::now();
             if next > now {
                 std::thread::sleep(next - now);
@@ -414,6 +466,7 @@ impl Sys {
     /// Nothing to do this iteration of a polling loop: yield a little.
     pub fn idle(&mut self) {
         self.check_quit();
+        self.sync_speed();
         match self.clock {
             Clock::Real { .. } => std::thread::sleep(Duration::from_millis(1)),
             Clock::Virtual { now, .. } => self.advance_virtual(now + 1),
@@ -430,11 +483,14 @@ impl Sys {
         }
         loop {
             self.check_quit();
+            let speed = self.sync_speed();
             let now = self.ticks();
             if (now.wrapping_sub(target) as i32) >= 0 {
                 return;
             }
-            std::thread::sleep(Duration::from_millis(((target.wrapping_sub(now)) as u64).min(10)));
+            // In short naps, so a change of speed is followed at once.
+            let left_us = target.wrapping_sub(now) as u64 * 1000 / speed as u64;
+            std::thread::sleep(Duration::from_micros(left_us.clamp(200, 10_000)));
         }
     }
 
@@ -467,7 +523,10 @@ impl Sys {
 
     /// Smooth motion on (frontend option; headless runs keep it off).
     pub fn smooth(&self) -> bool {
-        (matches!(self.clock, Clock::Real { .. }) || self.smooth_headless) && self.shared.smooth.load(Ordering::Relaxed)
+        // Not while fast forwarding: the in-between frames would only slow it.
+        (matches!(self.clock, Clock::Real { .. }) || self.smooth_headless)
+            && self.shared.smooth.load(Ordering::Relaxed)
+            && (self.is_virtual() || self.shared.speed() == 1)
     }
 
     /// Spacing of smooth-motion frames in ms: one display refresh (60 Hz
@@ -573,9 +632,7 @@ impl Sys {
             Msg::Key { vk: k, down, repeat } => {
                 self.pending_move = None;
                 let sc = scan_code(k);
-                let kind;
-                let key;
-                if down {
+                let (kind, key) = if down {
                     self.keys[k as usize] = true;
                     // TranslateMessage posts WM_CHAR, retrieved before later input.
                     if char_code(k, self.keys[vk::SHIFT as usize]) != 0 {
@@ -583,13 +640,11 @@ impl Sys {
                     }
                     let code = char_code(k, self.keys[vk::SHIFT as usize]) as u32 | (sc as u32) << 8;
                     self.key_codes[sc as usize] = code;
-                    kind = if repeat { ev::KEY_REPEAT } else { ev::KEY_DOWN };
-                    key = if repeat { code | 1 << 16 } else { code };
+                    (if repeat { ev::KEY_REPEAT } else { ev::KEY_DOWN }, if repeat { code | 1 << 16 } else { code })
                 } else {
                     self.keys[k as usize] = false;
-                    kind = ev::KEY_UP;
-                    key = std::mem::take(&mut self.key_codes[sc as usize]);
-                }
+                    (ev::KEY_UP, std::mem::take(&mut self.key_codes[sc as usize]))
+                };
                 let mut mods = 0;
                 if self.keys[vk::MENU as usize] {
                     mods |= ev::M_ALT;
@@ -766,6 +821,41 @@ mod tests {
 
     fn sys() -> Sys {
         Sys::new_headless(Shared::new(), Box::new(|_, _| {}))
+    }
+
+    /// Fast forward (not the original): the real clock runs faster while
+    /// asked to, never jumps, and the virtual clock ignores it.
+    #[test]
+    fn fast_forward_scales_the_real_clock_only() {
+        let shared = Shared::new();
+        let mut real = Sys::new(shared.clone(), crate::audio::Audio::silent());
+        let t0 = Instant::now();
+        real.sleep(30);
+        let plain = t0.elapsed();
+        assert!(plain >= Duration::from_millis(30), "30 ms of game time take 30 ms: {plain:?}");
+        shared.fast_speed.store(6, Ordering::Relaxed);
+        shared.fast_hold.store(true, Ordering::Relaxed);
+        let (t0, k0) = (Instant::now(), real.ticks());
+        real.sleep(300);
+        let (fast, k1) = (t0.elapsed(), real.ticks());
+        assert!(k1.wrapping_sub(k0) >= 300, "the game's clock passed the 300 ms");
+        assert!(fast < Duration::from_millis(200), "300 ms of game time at 6x took {fast:?}");
+        // Back to normal: the reading goes on from where it is.
+        shared.fast_hold.store(false, Ordering::Relaxed);
+        real.sleep(1);
+        let k2 = real.ticks();
+        assert!(k2 >= k1 && k2.wrapping_sub(k1) < 200, "no jump when the speed changes: {k1} -> {k2}");
+        // Only while the computer plays, with `fast_ai`.
+        shared.fast_ai.store(true, Ordering::Relaxed);
+        assert_eq!(shared.speed(), 1);
+        shared.ai_phase.store(true, Ordering::Relaxed);
+        assert_eq!(shared.speed(), 6);
+        // Headless runs keep their timeline.
+        let mut v = Sys::new_headless(shared.clone(), Box::new(|_, _| {}));
+        let t0 = Instant::now();
+        v.sleep(5000);
+        assert_eq!(v.ticks(), 5000);
+        assert!(t0.elapsed() < Duration::from_millis(1000));
     }
 
     #[test]

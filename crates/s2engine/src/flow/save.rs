@@ -237,7 +237,7 @@ pub fn save_bytes(game: &Game, desc: &[u8]) -> Vec<u8> {
         None
     } else {
         let b = crate::event::save_state(game);
-        Some(b[2..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect())
+        Some(b[2..].as_chunks::<2>().0.iter().map(|c| i16::from_le_bytes([c[0], c[1]])).collect())
     };
     SaveFile {
         description,
@@ -321,7 +321,9 @@ pub fn write_save(game: &mut Game, n: usize) -> Result<()> {
     let desc = describe(game);
     game.ui.save_desc[n - 1] = desc.clone();
     let bytes = save_bytes(game, &desc);
-    write_slot_file(game, n - 1, &bytes)
+    write_slot_file(game, n - 1, &bytes)?;
+    super::dynamic::save_side(game, n - 1);
+    Ok(())
 }
 
 /// `FUN_0043174d`: the loading progress frame.
@@ -359,6 +361,7 @@ pub fn load_game(game: &mut Game, slot: usize) -> Result<()> {
     let b = game.data.dir.read(&slot_path(slot))?;
     game.battle.load_tables(game.data)?;
     apply_save(game, &b)?;
+    super::dynamic::load_side(game, slot);
     if !game.campaign.between_stages && was_between {
         // FUN_0040ff73: the world-map pictures are freed.
         game.ui.world = None;

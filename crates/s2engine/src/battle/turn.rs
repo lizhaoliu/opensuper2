@@ -692,6 +692,18 @@ pub fn auto_phase(game: &mut Game, side: Side) -> i32 {
 }
 
 fn auto_phase_mode(game: &mut Game, side: Side, mode: i32) -> i32 {
+    // Not the original: tell the frontend the computer is playing (fast
+    // forward, `Shared::speed`).
+    game.sys.shared().ai_phase.store(true, std::sync::atomic::Ordering::Relaxed);
+    // The danger zone (not the original) is the player's own planning aid.
+    let showing = std::mem::replace(&mut game.battle.view.danger.showing, false);
+    let c = auto_phase_loop(game, side, mode);
+    game.battle.view.danger.showing = showing;
+    game.sys.shared().ai_phase.store(false, std::sync::atomic::Ordering::Relaxed);
+    c
+}
+
+fn auto_phase_loop(game: &mut Game, side: Side, mode: i32) -> i32 {
     let (mut x, mut y) = (0, 0);
     let mut c = 0;
     loop {
@@ -917,7 +929,10 @@ fn bond_survivors(game: &mut Game, r: UnitRef) {
 /// applies on its own where the original adds none); never in two-player
 /// battles. With the boost at 0 this is exactly the original.
 pub fn adapt_difficulty(game: &mut Game) {
-    let boost = if game.campaign.vs_mode { 0 } else { game.options.enemy_boost as i32 };
+    // With `dynamic_difficulty` the boost is part of the bonus set once the
+    // stage's first units stand on the map (`flow::dynamic`).
+    let dynamic = game.options.dynamic_difficulty && !game.campaign.vs_mode;
+    let boost = if game.campaign.vs_mode || dynamic { 0 } else { game.options.enemy_boost as i32 };
     // The enemy army is cleared at every stage start (FUN_0043deeb), so a
     // non-zero bonus here means a mid-stage save was loaded: it already
     // holds the boost, which must not be applied twice.

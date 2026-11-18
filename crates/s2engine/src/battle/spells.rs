@@ -293,10 +293,9 @@ impl Battle {
     pub fn spell_listed(&self, r: UnitRef, spell: u16, listing: bool, browse: bool) -> bool {
         let sp = self.spell_def(spell);
         if sp.combo & 7 == 0 {
-            if !listing && sp.effect > 0x14 && sp.effect < 0x20 && self.army(r.side).summons.iter().any(|s| s.active == 1) {
-                return false;
-            }
-            true
+            // A summon spell (effects 0x15..=0x1f) needs a free summon.
+            let summon_out = sp.effect > 0x14 && sp.effect < 0x20 && self.army(r.side).summons.iter().any(|s| s.active == 1);
+            listing || !summon_out
         } else if listing {
             true
         } else if browse {

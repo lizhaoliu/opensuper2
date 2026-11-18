@@ -25,6 +25,7 @@ pub fn reset_campaign_counters(game: &mut Game) {
     game.campaign.fame = game.res().param(P_FAME) as i8 as i32;
     game.campaign.rating = game.res().param(P_RATING) as i8 as i32;
     game.campaign.battles_fought = 0;
+    game.dynamic = Default::default();
 }
 
 /// Port of `FUN_0041a583(stage)`: run a story-only stage's turn-1 events

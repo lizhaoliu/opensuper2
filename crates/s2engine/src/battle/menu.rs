@@ -117,9 +117,17 @@ fn key_code(game: &mut Game) -> i32 {
         0x0f => -0x15,
         0x11 => -0x20,
         0x10 => -0x1f,
+        // Not the original (it has nothing on D): the danger zone.
+        0x20 if game.ev.kind == ev::KEY_DOWN => CODE_DANGER,
         _ => 0,
     }
 }
+
+/// Map command code of the D key (not the original): toggle the danger
+/// zone (`view::danger_toggle`). The player phase and a unit's command menu
+/// act on it; the other map loops pass it to `Map::scroll_key`, which
+/// knows no such code.
+const CODE_DANGER: i32 = -0x22;
 
 /// Port of FUN_00426056: after a keyboard move, a cursor whose top (the
 /// cell's height, 1..=0x14, above its row) is above row 1 goes back to the
@@ -251,6 +259,16 @@ pub fn input(game: &mut Game, x: &mut i32, y: &mut i32, mode: i32) -> i32 {
 /// acted (after the NPC allies' turn) or the stage code: 1 victory, 2
 /// defeat, 7/8 loaded a save, 0xb quit, 0xf retreat.
 pub fn player_phase(game: &mut Game) -> i32 {
+    // Not the original: the dynamic difficulty of a stage just begun or
+    // loaded is shown, and the danger zone shows while the player plays.
+    crate::flow::dynamic::announce(game);
+    view::danger_showing(game, true);
+    let r = player_phase_loop(game);
+    view::danger_showing(game, false);
+    r
+}
+
+fn player_phase_loop(game: &mut Game) -> i32 {
     super::sync(game);
     let mut redraw_status = true;
     let mut cycle = 1usize;
@@ -259,6 +277,7 @@ pub fn player_phase(game: &mut Game) -> i32 {
     camera::redraw_full(game);
     loop {
         actions::pump(game);
+        view::danger_refresh(game);
         if !game.cfg.auto_switch {
             auto = 0;
         }
@@ -268,6 +287,10 @@ pub fn player_phase(game: &mut Game) -> i32 {
         let (mut x, mut y) = (0, 0);
         let code = input(game, &mut x, &mut y, 0);
         match code {
+            CODE_DANGER => {
+                view::danger_toggle(game);
+                redraw_status = true;
+            }
             0 => {
                 if redraw_status {
                     status_redraw(game);
@@ -877,6 +900,8 @@ fn menu_input(game: &mut Game, m: &mut Menu, code: &mut i32) -> i32 {
                 warp(game, m);
                 0
             }
+            // Not the original: D, the danger zone.
+            0x20 if kind == ev::KEY_DOWN => CODE_DANGER,
             _ => 0,
         };
     }
@@ -934,6 +959,7 @@ pub fn command_loop(game: &mut Game, r: UnitRef, mut code: i32) -> i32 {
     let mut rebuild = true;
     loop {
         actions::pump(game);
+        view::danger_refresh(game);
         if rebuild {
             menu = build_menu(game, r);
             draw_menu(game, r, &mut menu);
@@ -1127,6 +1153,10 @@ pub fn command_loop(game: &mut Game, r: UnitRef, mut code: i32) -> i32 {
                 if presenting(game) => {
                     cursor::draw_present(game, None, true);
                 }
+            CODE_DANGER => {
+                view::danger_toggle(game);
+                draw_menu(game, r, &mut menu);
+            }
             _ => {}
         }
     }

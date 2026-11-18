@@ -212,9 +212,132 @@ pub struct BattleView {
     pub mount_phase: usize,
     /// Smooth motion: the unit drawn between two cells (not the original).
     pub nudge: Option<smooth::Nudge>,
+    /// The danger zone display (not the original).
+    pub danger: Danger,
     /// The map surface is to be rebuilt from the background (after a new
     /// map or background, or a load).
     fresh: bool,
+}
+
+/// The danger zone (not the original; D in the player phase): the cells
+/// the enemy could strike on its next turn (`ai_plus::danger_zone`) are
+/// tinted red in the map window while the player plays.
+#[derive(Default)]
+pub struct Danger {
+    /// Switched on by the player (kept from battle to battle).
+    pub on: bool,
+    /// The player phase is running.
+    pub showing: bool,
+    zone: Vec<bool>,
+    /// What `zone` was computed from, and a count of its versions.
+    zone_key: Option<u64>,
+    version: u64,
+    /// The mask of the zone in the window, for this scroll, zone version
+    /// and arrangement of units.
+    layer: Option<Image>,
+    layer_key: (i32, i32, u64, u64),
+    lut: Option<Box<[u8; 256]>>,
+}
+
+impl Danger {
+    fn forget(&mut self) {
+        self.zone.clear();
+        self.zone_key = None;
+        self.layer = None;
+    }
+
+    fn visible(&self) -> bool {
+        self.on && self.showing && self.zone_key.is_some()
+    }
+
+    /// Tint the zone's cells in the map window `dst`.
+    fn apply(&mut self, dst: &mut Image, os: &OverlayScene, tree: &s2data::gfx_palette::ColorTree, units_key: u64) {
+        let key = (os.map.scroll_x, os.map.scroll_y, self.version, units_key);
+        if self.layer.is_none() || self.layer_key != key {
+            self.layer = Some(os.build_mask(&self.zone));
+            self.layer_key = key;
+        }
+        let lut = self.lut.get_or_insert_with(|| {
+            // Toward the palette's red.
+            let red = tree.nearest(63, 4, 4, 64);
+            Box::new(tree.tint_table(red, DANGER_TINT))
+        });
+        if let Some(layer) = &self.layer {
+            for (d, m) in dst.pixels.iter_mut().zip(&layer.pixels) {
+                if *m != 0 {
+                    *d = lut[*d as usize];
+                }
+            }
+        }
+    }
+}
+
+/// How red the danger zone is, in %.
+const DANGER_TINT: i32 = 32;
+
+fn hash_of(f: impl FnOnce(&mut std::collections::hash_map::DefaultHasher)) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    f(&mut h);
+    h.finish()
+}
+
+/// D in the player phase: switch the danger zone on or off. Not in
+/// two-player battles, and not at the difficulty where the original hides
+/// the enemy's ranges (5).
+pub fn danger_toggle(game: &mut Game) {
+    if !danger_allowed(game) {
+        return;
+    }
+    let d = &mut game.battle.view.danger;
+    d.on = !d.on;
+    let on = d.on;
+    game.sys.shared().post_notice(if on { "威脅範圍：開" } else { "威脅範圍：關（原版）" });
+    danger_refresh(game);
+}
+
+fn danger_allowed(game: &Game) -> bool {
+    !game.battle.vs && game.battle.difficulty != 5
+}
+
+/// The player phase begins or ends.
+pub fn danger_showing(game: &mut Game, showing: bool) {
+    game.battle.view.danger.showing = showing;
+    danger_refresh(game);
+}
+
+/// Recompute the zone if the units it depends on changed. Called from the
+/// loops of the player phase and the command menu, never while a unit is
+/// being moved about.
+pub fn danger_refresh(game: &mut Game) {
+    use std::hash::Hash;
+    let d = &game.battle.view.danger;
+    if !(d.on && d.showing) || game.battle.tables.is_none() || game.battle.view.map.is_none() {
+        return;
+    }
+    if !danger_allowed(game) {
+        // Switched on in an earlier battle.
+        game.battle.view.danger.forget();
+        return;
+    }
+    let b = &game.battle;
+    let key = hash_of(|h| {
+        b.turn.hash(h);
+        for side in [Side::Player, Side::Enemy] {
+            for u in &b.army(side).units {
+                (u.x, u.y, u.flags, u.ap, u.ap_base, u.ap_carry, u.status, u.buffs, u.equip[0], u.mp, u.st, u.hp > 0).hash(h);
+            }
+        }
+    });
+    if game.battle.view.danger.zone_key == Some(key) {
+        return;
+    }
+    let zone = super::ai_plus::danger_zone(&mut game.battle, Side::Player);
+    super::trace!("danger zone: {} cells", zone.iter().filter(|&&z| z).count());
+    let d = &mut game.battle.view.danger;
+    d.zone = zone;
+    d.zone_key = Some(key);
+    d.version += 1;
 }
 
 impl BattleView {
@@ -398,6 +521,7 @@ pub fn init(game: &mut Game, map_id: usize) -> Result<()> {
     v.map = Some(mv);
     v.units = [Vec::new(), Vec::new()];
     v.range = None;
+    v.danger.forget();
     v.fresh = true;
     v.cursor = MapCursor::default();
     // The data segment's initial value.
@@ -742,10 +866,25 @@ fn draw_scene(game: &mut Game, lifted: bool, with_cursor: bool, with_range: bool
     if let Some(rp) = v.range.as_mut().filter(|_| with_range) {
         rp.compose(dst, now, v.range_hard, &assets.tints, (mv.scroll_x, mv.scroll_y));
     }
-    if !lifted {
+    let danger = v.danger.visible();
+    if !lifted && !danger {
         return;
     }
     let pl = placed(&lk, &v.units);
+    if danger {
+        // Not the original: the danger zone over the window and the range.
+        use std::hash::Hash;
+        let units_key = hash_of(|h| {
+            for l in lk.iter().flatten() {
+                (l.x, l.y, l.facing, l.frame, l.act, l.flags, l.invisible).hash(h);
+            }
+        });
+        let os = OverlayScene { map: mv, tiles: &assets.tiles, shading: &assets.shading, g, armies: [&pl[0], &pl[1]] };
+        v.danger.apply(dst, &os, &assets.tree, units_key);
+    }
+    if !lifted {
+        return;
+    }
     let scene = UnitScene { map: mv, tiles: &assets.tiles, shading: &assets.shading, art: assets.unit_art(), g, armies: [&pl[0], &pl[1]] };
     let mut updates = Vec::new();
     let nudge = v.nudge;

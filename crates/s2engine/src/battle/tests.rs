@@ -612,3 +612,44 @@ fn loaded_dead_units_sprite_fields() {
     assert_eq!((u.sprite, u.facing, u.frame), (0, 0, 2));
     assert_eq!((u.sprite_w, u.sprite_h), (0x80, 0xa0));
 }
+
+/// `exp_catchup=1` (not the original): a unit below the party's average
+/// power earns more, the strongest and the other army earn what they did.
+#[test]
+fn exp_catchup_favours_units_behind_the_party() {
+    let Some((mut b, _)) = stage_battle(1) else { return };
+    let own: Vec<UnitRef> = (0..b.army(Side::Player).units.len())
+        .map(|i| UnitRef::new(Side::Player, i))
+        .filter(|&r| b.unit(r).npc != 1 && b.unit(r).flags & (flag::SUMMON | flag::RESERVE) == 0)
+        .collect();
+    assert!(own.len() >= 2, "stage 1 has a party");
+    // Make one of them plainly the weakest.
+    let weak = own[0];
+    {
+        let u = b.unit_mut(weak);
+        u.hp_max = (u.hp_max / 3).max(1);
+        u.atk /= 3;
+        u.def /= 3;
+    }
+    let power = |b: &Battle, r: UnitRef| b.power_quiet(b.unit(r), 2);
+    let strong = *own.iter().max_by_key(|&&r| power(&b, r)).unwrap();
+    let avg = own.iter().map(|&r| power(&b, r) as i64).sum::<i64>() / own.len() as i64;
+    assert!((power(&b, weak) as i64) < avg);
+    let pct = b.exp_catchup_pct(weak);
+    assert!(pct > 0 && pct <= super::combat::EXP_CATCHUP_MAX, "weakest unit: +{pct}%");
+    assert_eq!(b.exp_catchup_pct(strong), 0, "the strongest earns no bonus");
+    let enemy = UnitRef::new(Side::Enemy, 0);
+    assert_eq!(b.exp_catchup_pct(enemy), 0, "nor does the other army");
+    // Off (the original): the same EXP for both; on: more for the weak one.
+    b.unit_mut(weak).exp = 0;
+    b.unit_mut(strong).exp = 0;
+    let (w0, s0) = (b.award_exp(weak, 100, &[]), b.award_exp(strong, 100, &[]));
+    assert_eq!(w0, s0);
+    b.exp_catchup = true;
+    b.unit_mut(weak).exp = 0;
+    b.unit_mut(strong).exp = 0;
+    let (w1, s1) = (b.award_exp(weak, 100, &[]), b.award_exp(strong, 100, &[]));
+    assert_eq!(s1, s0);
+    assert_eq!(w1, w0 + w0 * pct / 100);
+    assert!(w1 > w0);
+}

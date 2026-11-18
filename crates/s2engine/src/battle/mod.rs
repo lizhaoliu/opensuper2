@@ -130,6 +130,10 @@ pub struct Battle {
     /// battle — the enemy army varies its picks and buffs its own side
     /// (`ai::fight`, `targeting::score_support`). Synced by [`sync`].
     pub ai_varied: bool,
+    /// Not the original: `exp_catchup=1` outside two-player battles — a
+    /// unit weaker than the party's average earns more EXP
+    /// (`Battle::exp_catchup_pct`). Synced by [`sync`].
+    pub exp_catchup: bool,
     /// Mirror of `campaign.vs_mode` (`DAT_00494668`).
     pub vs: bool,
     /// Mirror of `campaign.turn` (`DAT_00494674`).
@@ -186,6 +190,7 @@ impl Default for Battle {
             cursor: (-1, -1),
             difficulty: 3,
             ai_varied: false,
+            exp_catchup: false,
             vs: false,
             turn: 1,
             route: 0,
@@ -259,6 +264,7 @@ pub fn sync(game: &mut crate::game::Game) {
     b.seal_magic = c.flags[9] != 0;
     b.seal_tech = c.flags[10] != 0;
     b.ai_varied = game.options.ai == crate::game::AiMode::Enhanced && !c.vs_mode;
+    b.exp_catchup = game.options.exp_catchup && !c.vs_mode;
 }
 
 impl std::fmt::Debug for Battle {

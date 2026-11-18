@@ -221,6 +221,14 @@ pub struct Options {
     /// attack/defence/剣術/戰技, added to the original's per-stage army bonus
     /// (`turn::adapt_difficulty`); never in two-player battles. 0 = off.
     pub enemy_boost: u8,
+    /// `dynamic_difficulty=1` (not the original): at the start of a stage
+    /// the enemy's stats follow how strong the party is next to the enemy
+    /// army (`turn::dynamic_difficulty`); never in two-player battles.
+    pub dynamic_difficulty: bool,
+    /// `exp_catchup=1` (not the original): a unit weaker than the party's
+    /// average earns more EXP (`Battle::exp_catchup_pct`); never in
+    /// two-player battles.
+    pub exp_catchup: bool,
 }
 
 pub struct Game<'a> {
@@ -244,6 +252,8 @@ pub struct Game<'a> {
     pub stage: Option<crate::flow::stage::StageState>,
     /// Options outside the original ([`Options`]).
     pub options: Options,
+    /// State of `dynamic_difficulty` (not the original; `flow::dynamic`).
+    pub dynamic: crate::flow::dynamic::Dynamic,
 }
 
 impl<'a> Game<'a> {
@@ -263,6 +273,7 @@ impl<'a> Game<'a> {
             ui: UiState::default(),
             stage: None,
             options: Options::default(),
+            dynamic: Default::default(),
         }
     }
 

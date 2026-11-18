@@ -290,6 +290,80 @@ pub fn threat_map(b: &mut Battle, me: UnitRef) -> ThreatMap {
     tm
 }
 
+/// The danger zone shown to `side` (not the original; `view::danger`):
+/// per map cell (`row * width + col`), whether an able, visible unit of
+/// the other army could strike it on its next turn — a cell within its
+/// longest weapon range of where it stands or of a cell it can stop on
+/// with the AP for an attack left (`Node::budget`), or within the range of
+/// a damaging spell or technique it can pay for, with the AP for that.
+/// Line of sight and the shapes of the ranges are not weighed, so the zone
+/// errs on the wide side. Draws no RNG and leaves `Battle::range` alone.
+pub fn danger_zone(b: &mut Battle, side: Side) -> Vec<bool> {
+    let (width, rows) = (b.map().width(), b.map().rows());
+    let mut zone = vec![false; (width * rows).max(0) as usize];
+    let saved_range = b.range.clone();
+    let snap = b.rng.snapshot();
+    let foe = side.other();
+    for i in 0..b.army(foe).units.len() {
+        let p = UnitRef::new(foe, i);
+        if !able(b, p) || b.is_hidden(foe, b.unit(p)) {
+            continue;
+        }
+        let u = b.unit(p).clone();
+        let t = b.t();
+        let mut hit = 0;
+        if let Some(c) = t.kinds.class(u.kind as u16) {
+            for k in c.actions.clone() {
+                let kind = b.action_kind(k);
+                if kind == 0xb || kind == 0xc || !b.skill_usable(&u, k) {
+                    continue;
+                }
+                hit = hit.max(b.skill_range(&u, k).1);
+            }
+        }
+        let mut spell_reach = 0;
+        for (spell, technique) in known_spells(b, p) {
+            let aim = b.spell_aim(spell as i32);
+            if !damage_effect(aim.effect) || aim.target == 0 || aim.target == 1 {
+                continue;
+            }
+            if b.spell_shortage(&u, spell) != Shortage::Ok || (!technique && u.status & status::SEALED != 0) {
+                continue;
+            }
+            if aim.combo & 7 != 0 && b.combo_partner(p, spell).is_none() {
+                continue;
+            }
+            spell_reach = spell_reach.max(aim.range + 1);
+        }
+        if hit == 0 && spell_reach == 0 {
+            continue;
+        }
+        // Its range with a whole turn's AP.
+        let full = u.ap.max(u.ap_base + u.ap_carry);
+        b.unit_mut(p).ap = full;
+        b.build_range(p, 0);
+        b.unit_mut(p).ap = u.ap;
+        let (attack_cost, spell_cost) = (b.range.attack_cost, b.range.spell_cost);
+        let mut stops: Vec<(i32, i32, i32)> = vec![(u.x, u.y, full as i32)];
+        stops.extend(b.range.reachable().filter(|(_, n)| n.can_stop != 0).map(|(_, n)| (n.x as i32, n.y as i32, n.budget as i32)));
+        for (x, y, budget) in stops {
+            let mut reach = 0;
+            if budget >= attack_cost {
+                reach = hit;
+            }
+            if budget >= spell_cost {
+                reach = reach.max(spell_reach);
+            }
+            if reach > 0 {
+                for_cells_within(width, rows, x, y, reach, |cx, cy| zone[(cy * width + cx) as usize] = true);
+            }
+        }
+    }
+    b.range = saved_range;
+    b.rng.restore(snap);
+    zone
+}
+
 // ---------------------------------------------------------------------------
 // Target priority.
 
@@ -951,6 +1025,52 @@ mod tests {
     fn first_enemy(b: &Battle) -> UnitRef {
         let i = b.army(Side::Enemy).units.iter().position(|u| u.on_map()).expect("an enemy on the map");
         UnitRef::new(Side::Enemy, i)
+    }
+
+    #[test]
+    fn danger_zone_surrounds_the_enemy_and_changes_nothing() {
+        let Some(mut b) = stage1() else { return eprintln!("ai_plus tests: no game data, skipped") };
+        let rng = b.rng.snapshot();
+        b.build_range(first_enemy(&b), 0);
+        let range = (b.range.unit, b.range.count);
+        let aps: Vec<i16> = b.army(Side::Enemy).units.iter().map(|u| u.ap).collect();
+        let zone = danger_zone(&mut b, Side::Player);
+        assert_eq!(b.rng.snapshot(), rng, "the danger zone draws no RNG");
+        assert_eq!((b.range.unit, b.range.count), range, "and leaves the shown range alone");
+        assert_eq!(b.army(Side::Enemy).units.iter().map(|u| u.ap).collect::<Vec<_>>(), aps);
+        let (w, rows) = (b.map().width(), b.map().rows());
+        assert_eq!(zone.len(), (w * rows) as usize);
+        let at = |x: i32, y: i32| x >= 0 && y >= 0 && x < w && y < rows && zone[(y * w + x) as usize];
+        // An enemy that can act threatens its own cell and the cells next to it.
+        let mut armed = 0;
+        for u in b.army(Side::Enemy).units.iter().filter(|u| u.on_map() && u.can_act()) {
+            if !at(u.x, u.y) {
+                continue;
+            }
+            armed += 1;
+            for dir in 0..4 {
+                let (nx, ny) = crate::battle::map::neighbour(u.x, u.y, dir);
+                if nx >= 0 && ny >= 0 && nx < w && ny < rows {
+                    assert!(at(nx, ny), "neighbour ({nx}, {ny}) of the enemy on ({}, {})", u.x, u.y);
+                }
+            }
+        }
+        assert!(armed > 0, "stage 1's enemies threaten something");
+        // Nothing far from every enemy is in the zone.
+        for y in 0..rows {
+            for x in 0..w {
+                if at(x, y) {
+                    let near = b.army(Side::Enemy).units.iter().filter(|u| u.on_map()).map(|u| distance(x, y, u.x, u.y)).min().unwrap();
+                    assert!(near <= 30, "({x}, {y}) is {near} cells from the nearest enemy");
+                }
+            }
+        }
+        // The player's units cast no danger on themselves: with every enemy
+        // gone the zone is empty.
+        for u in b.army_mut(Side::Enemy).units.iter_mut() {
+            u.flags |= crate::battle::unit::flag::DEAD;
+        }
+        assert!(danger_zone(&mut b, Side::Player).iter().all(|&z| !z));
     }
 
     #[test]

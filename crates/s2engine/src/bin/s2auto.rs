@@ -91,6 +91,9 @@ struct Args {
     enemy_ai: s2engine::game::AiMode,
     /// `--enemy-boost N`: N % stronger enemies (not the original).
     enemy_boost: u8,
+    /// `--dynamic-difficulty` / `--exp-catchup` (not the original).
+    dynamic_difficulty: bool,
+    exp_catchup: bool,
     exit_cheat: bool,
     recover: usize,
     reseed: bool,
@@ -130,6 +133,8 @@ fn parse_args() -> Result<Args> {
         god: false,
         enemy_ai: s2engine::game::AiMode::Original,
         enemy_boost: 0,
+        dynamic_difficulty: false,
+        exp_catchup: false,
         exit_cheat: false,
         recover: 0,
         reseed: false,
@@ -184,6 +189,8 @@ fn parse_args() -> Result<Args> {
             "--enemy-boost" => {
                 a.enemy_boost = it.next().and_then(|v| v.parse().ok()).context("--enemy-boost N (0..=100)")?;
             }
+            "--dynamic-difficulty" => a.dynamic_difficulty = true,
+            "--exp-catchup" => a.exp_catchup = true,
             "--exit-cheat" => a.exit_cheat = true,
             "--recover" => a.recover = val("--recover")?.parse()?,
             "--reseed" => a.reseed = true,
@@ -264,7 +271,12 @@ fn worker(a: &Args) -> Result<()> {
     });
     let mut driver = Driver::new(a.out.clone(), a.hang_minutes);
     let hook = Box::new(move |info: &s2engine::sys::FlipInfo, sh: &Shared| driver.on_frame(info, sh));
-    let options = s2engine::game::Options { ai: a.enemy_ai, enemy_boost: a.enemy_boost.min(100) };
+    let options = s2engine::game::Options {
+        ai: a.enemy_ai,
+        enemy_boost: a.enemy_boost.min(100),
+        dynamic_difficulty: a.dynamic_difficulty,
+        exp_catchup: a.exp_catchup,
+    };
     let handle = spawn_headless(Shared::new(), hook, move |sys| {
         let mut game = s2engine::game::Game::new(sys, &data);
         game.options = options;
@@ -846,6 +858,8 @@ fn worker_cmd(a: &Args, route: u8, game: &Path, out: &Path) -> Result<Command> {
         (a.random_choices, "--random-choices"),
         (a.passive, "--passive"),
         (a.god, "--god"),
+        (a.dynamic_difficulty, "--dynamic-difficulty"),
+        (a.exp_catchup, "--exp-catchup"),
         (a.exit_cheat, "--exit-cheat"),
         (a.reseed, "--reseed"),
         (a.caves, "--caves"),

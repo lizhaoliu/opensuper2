@@ -17,8 +17,10 @@ cites the `FUN_xxxxxxxx` it reproduces; see `docs/coverage.md`): opening
 movies, title, campaign story and events, battles with the original rules,
 RNG and AI, magic, items, class changes, world map, towns, shops, church,
 deployment, save/load (original `SAVE\UJnn.SAV` format), settings,
-two-player battles and the ending; optional enemy AI variants and an enemy
-stat boost are off by default.
+two-player battles and the ending. Extras that are not the original's
+(enemy AI variants, an enemy stat boost, dynamic difficulty, EXP catch-up,
+the danger zone, fast forward, display filters, smooth motion) are off by
+default.
 
 Verification: the original program runs headlessly as an oracle
 (`docs/oracle.md`) and is compared with the port pixel by pixel, save by
@@ -50,6 +52,17 @@ Windows; elsewhere pass `--soundfont FILE.sf2`.
   frame at the original's time, and nothing else changes: with
   `S2_SMOOTH=1` a headless run draws them too and stays shot-for-shot and
   RNG-identical to one without.
+- D in a battle (your phase, also with a unit's command menu open): the
+  danger zone on/off — every cell an enemy could strike on its next turn
+  (moving with a full turn's AP, then its longest weapon range or a damaging
+  spell or technique it can pay for) is tinted red, under the move range
+  too. It is recomputed as units move, die or change; line of sight is not
+  weighed, so it errs on the wide side. Not in two-player battles, and not
+  at the hardest difficulty, where the original hides the enemy's ranges.
+- F8: fast forward while the computer plays (enemy phase, NPC allies, 自動
+  作戰) on/off; holding `` ` `` (left of 1) fast forwards anything. The
+  game's clock runs `fast_speed` times faster — animations, waits and
+  scrolling alike — and nothing else changes.
 - `opensuper2.ini` (next to the game files): `fullscreen=0|1`,
   `filter=nearest|sharp|xbr|crt`, `smooth=0|1`, `renderer=gpu|cpu`,
   `scaling=fit|integer`, `window=W,H`, `fade_speed=1..16` (palette fades
@@ -62,6 +75,16 @@ Windows; elsewhere pass `--soundfont FILE.sf2`.
   side; `tactical` is a threat-map AI (focus fire, objective targets,
   positioning); `enemy_boost` adds N % to enemy HP/MP/ST and attack /
   defence / 劍術 / 戰技 on top of the original's per-stage bonus.
+  `dynamic_difficulty=0|1`: the enemy's stats follow how your battles go —
+  a *pressure* of −20..+30 % that rises 3 with every battle won without
+  losing a unit, falls 4 per unit lost beyond the first (12 at most) and 4
+  per failed attempt, and is added to `enemy_boost` at the start of each
+  stage (shown for a moment); a stage you lost is eased by 8 % per defeat
+  when you try it again. It is kept beside each save as `SAVE\UJnn.DYN`,
+  the saves themselves stay in the original format. `exp_catchup=0|1`: a
+  unit whose 強度 is below the party's average earns that much more EXP
+  (20 % below the average: +20 %; at most +75 %). `enemy_fast=0|1` (what F8
+  toggles) and `fast_speed=2..8` (default 4) set fast forward.
 - Problems (and the GPU in use) are written to `opensuper2.log` next to
   the game files. `opensuper2 --filter-shots SHOT.png DIR` renders a
   640x480 screenshot through every filter without a window.

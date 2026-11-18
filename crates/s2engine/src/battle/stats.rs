@@ -54,6 +54,16 @@ impl Battle {
         }
     }
 
+    /// [`Battle::power`] (total, max stats) for code that is not the
+    /// original's: the parts the original caches from its own last call
+    /// stay as they are.
+    pub fn power_quiet(&self, u: &Unit, mode: i32) -> i32 {
+        let keep = CACHE.with(|c| c.get());
+        let p = self.power(u, mode, 0);
+        CACHE.with(|c| c.set(keep));
+        p
+    }
+
     /// Port of FUN_0042345b (via `rules::growth`): the nine growth rolls.
     pub fn roll_growth(&mut self, kind: i16, level: i32) -> [i32; 9] {
         let t = self.t();

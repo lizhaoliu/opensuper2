@@ -92,6 +92,17 @@ pub struct FrontConfig {
     pub ai: s2engine::game::AiMode,
     /// `enemy_boost=0..100`: extra % on enemy stats (not the original).
     pub enemy_boost: u8,
+    /// `dynamic_difficulty=0|1`: enemy stats follow how the battles go
+    /// (not the original).
+    pub dynamic_difficulty: bool,
+    /// `exp_catchup=0|1`: units behind the party earn more EXP (not the
+    /// original).
+    pub exp_catchup: bool,
+    /// `enemy_fast=0|1`: fast forward while the computer plays (not the
+    /// original; F8 toggles).
+    pub enemy_fast: bool,
+    /// `fast_speed=2..8`: how fast fast forward is (also while ` is held).
+    pub fast_speed: u32,
     pub filter: Filter,
     pub renderer: Renderer,
     /// `smooth=0|1`: in-between frames for walking, flying and camera
@@ -110,6 +121,10 @@ impl FrontConfig {
             fade_speed: 1,
             ai: Default::default(),
             enemy_boost: 0,
+            dynamic_difficulty: false,
+            exp_catchup: false,
+            enemy_fast: false,
+            fast_speed: 4,
             filter: Filter::Nearest,
             renderer: Renderer::Gpu,
             smooth: false,
@@ -131,6 +146,10 @@ impl FrontConfig {
                 "fade_speed" => c.fade_speed = v.parse::<u32>().unwrap_or(1).clamp(1, 16),
                 "ai" => c.ai = s2engine::game::AiMode::parse(v).unwrap_or_default(),
                 "enemy_boost" => c.enemy_boost = v.parse::<u8>().unwrap_or(0).min(100),
+                "dynamic_difficulty" => c.dynamic_difficulty = v == "1",
+                "exp_catchup" => c.exp_catchup = v == "1",
+                "enemy_fast" => c.enemy_fast = v == "1",
+                "fast_speed" => c.fast_speed = v.parse::<u32>().unwrap_or(4).clamp(2, 8),
                 "filter" => c.filter = Filter::parse(v).unwrap_or(Filter::Nearest),
                 "renderer" => c.renderer = if v == "cpu" { Renderer::Cpu } else { Renderer::Gpu },
                 "smooth" => c.smooth = v == "1",
@@ -146,6 +165,8 @@ impl FrontConfig {
             Scaling::Integer => "integer",
         }, self.fade_speed);
         s += &format!("ai={}\nenemy_boost={}\n", self.ai.name(), self.enemy_boost);
+        s += &format!("dynamic_difficulty={}\nexp_catchup={}\n", self.dynamic_difficulty as u8, self.exp_catchup as u8);
+        s += &format!("enemy_fast={}\nfast_speed={}\n", self.enemy_fast as u8, self.fast_speed);
         s += &format!("filter={}\nsmooth={}\n", self.filter.name(), self.smooth as u8);
         if self.renderer == Renderer::Cpu {
             s += "renderer=cpu\n";

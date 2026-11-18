@@ -124,7 +124,7 @@ impl Wave {
     pub fn samples_f32(&self) -> Vec<f32> {
         match self.bits_per_sample {
             8 => self.data.iter().map(|&s| (s as f32 - 128.0) / 128.0).collect(),
-            _ => self.data.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect(),
+            _ => self.data.as_chunks::<2>().0.iter().map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect(),
         }
     }
 }

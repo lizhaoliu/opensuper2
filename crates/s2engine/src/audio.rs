@@ -62,7 +62,7 @@ impl Mixer {
             let Some(s) = v.sample.clone() else { continue };
             let step = s.rate as f64 / out_rate;
             let n = s.frames();
-            for frame in out.chunks_exact_mut(2) {
+            for frame in out.as_chunks_mut::<2>().0 {
                 let i = v.pos as usize;
                 if i + 1 >= n {
                     if i < n {

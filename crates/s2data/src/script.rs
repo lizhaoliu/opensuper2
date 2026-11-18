@@ -203,7 +203,7 @@ impl Stage {
                 2 => Reward::Leave(take(n)?),
                 3 => Reward::Gold(take(1)?[0]),
                 4 => Reward::Items(take(n)?),
-                5 => Reward::Treasure(take(n)?.chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect()),
+                5 => Reward::Treasure(take(n)?.as_chunks::<4>().0.iter().map(|c| [c[0], c[1], c[2], c[3]]).collect()),
                 _ => Reward::Unknown(kind, take(n)?),
             };
             vals += 2 * if kind == 3 { 1 } else { n };

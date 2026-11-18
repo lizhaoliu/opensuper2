@@ -653,14 +653,13 @@ fn counters(game: &mut Game, targets: &[UnitRef], duels: &[Duel], att: UnitRef) 
                 }
             }
             let b = &mut game.battle;
-            let cr;
-            if is_counter {
+            let cr = if is_counter {
                 dmg[k] = b.roll_counter(&ds[k]);
-                cr = b.roll_crit_counter(&ds[k]);
+                b.roll_crit_counter(&ds[k])
             } else {
                 dmg[k] = b.roll_attack(&mut ds[k]);
-                cr = b.roll_crit(&ds[k]);
-            }
+                b.roll_crit(&ds[k])
+            };
             if dmg[k] > 0 {
                 any_hit = true;
             }
