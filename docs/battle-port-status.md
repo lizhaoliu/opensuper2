@@ -39,8 +39,10 @@ Optional, not part of the original (`Game::options`, opensuper2.ini, s2auto flag
   is 0.34 to 3.9 times the enemy's from one stage to the next (stage 73: 0.34, stage 1: 2.9, stage 83: 3.9),
   against ±15 % between runs on one stage.
   Check: 4 seeds x both routes on 自動作戰, 3 retries: stages played 7/11/3/7 (route 0) and 11/14/11/11
-  (route 1) without it, 12/15/11/15 and 14/14/26/11 with it; the trace (`dynamic ...`) shows the pressure
-  rise on clean wins and each reload of a lost stage eased.
+  (route 1) without it, 12/15/11/15 and 14/14/26/11 with it (measured with +4 per clean win and retries
+  held at −20 %; with the values above seeds 1 and 2 play 15 and 22 stages on route 0, 11 and 11 on
+  route 1); the trace (`dynamic ...`) shows the pressure rise on clean wins and each reload of a lost
+  stage eased.
 - `exp_catchup=1` (`--exp-catchup`; `Battle::exp_catchup_pct`): the player's own unit whose power rating
   (max stats) is under the party's average earns that share more EXP, at most +75 %; applied after the
   original's scaling in `Battle::award_exp`, so the EXP box shows it.
